@@ -1,0 +1,29 @@
+[package]
+name = "gdpr"
+version = "0.1.0"
+edition = "2021"
+description = "GDPR - Granular Directus Permissions Resolver"
+authors = ["ctholho <info@akronym.org>"]
+license = "GPL v3"
+keywords = ["cli", "directus", "permissions", "crud", "sql"]
+categories = ["command-line-utilities", "development-tools", "database", "web-programming"]
+readme = "README.md"
+repository = ""
+documentation = ""
+
+[dependencies]
+clap = { version = "4.2.4", features = ["derive"] }
+sqlx = { version = "0.6.3", features = [ "runtime-tokio-rustls", "postgres", "json", "uuid" ] }
+uuid = { version = "1.3.1", features = ["v4", "serde"] }
+anyhow = "1.0"
+dotenvy = "0.15.0"
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+structopt = "0.3" 
+tokio = { version = "1.20.0", features = ["macros"]}
+
+
+[lib]
+name = "gdpr"
+path = "src/lib.rs"

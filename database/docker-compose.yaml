@@ -1,0 +1,115 @@
+version: "3.9"
+
+services:
+  # mysql:
+  # container_name: mysql
+  #   image: mysql:8
+  #   command: --default-authentication-plugin=mysql_native_password
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: secret
+  #     MYSQL_DATABASE: directus
+  #   ports:
+  #     - 5101:3306
+  #   cap_add:
+  #     - SYS_NICE
+
+  # mssql:
+  #   container_name: mssql
+  #   image: mcr.microsoft.com/mssql/server:2019-latest
+  #   environment:
+  #     - ACCEPT_EULA=Y
+  #     - SA_PASSWORD=Test@123
+  #   ports:
+  #     - 5103:1433
+
+
+  # mariadb:
+  #   container_name: mariadb
+  #   image: mariadb:latest
+  #   volumes:
+  #     - mariadb:/var/lib/mysql
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: dbpass
+  #     MYSQL_DATABASE: mydb
+  #   ports:
+  #     - 54323:3306
+
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    # command: ["postgres", "-c", "log_statement=all"]
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/a_seed.sql
+    ports:
+      - 54322:5432
+    environment:
+      POSTGRES_USER: 'dbuser'
+      POSTGRES_PASSWORD: 'dbpass'
+      POSTGRES_DB: 'mydb'
+
+  directus-pg:
+    container_name: directus-pg
+    image: directus/directus:latest
+    # volumes:
+    #   - ./pg-snapshot.yaml:/directus/snapshot.yaml
+    # command:
+    # - /bin/sh
+    # - -c
+    # - |
+    #   npx directus bootstrap
+    #   npx directus schema apply --yes ./snapshot.yaml
+    #   npx directus start
+    ports:
+      - 8055:8055
+    depends_on:
+      - postgres
+    environment:
+      PUBLIC_URL: ${DIRECTUS_PG_URL}
+      SECRET: 'my-directus-secret'
+      KEY: b1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6
+      # db settings
+      DB_CLIENT: 'pg'
+      DB_HOST: 'postgres'
+      DB_PORT: '5432'
+      DB_DATABASE: 'mydb'
+      DB_USER: 'dbuser'
+      DB_PASSWORD: 'dbpass'
+      # Admin settings if no database seed is used
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: admin
+
+  # directus-mysql:
+  #   container_name: directus-mysql
+  #   image: directus/directus:latest
+  #   volumes:
+  #     - ./mysql-snapshot.yaml:/directus/snapshot.yaml
+  #   command:
+  #   - /bin/sh
+  #   - -c
+  #   - |
+  #     npx directus bootstrap
+  #     npx directus schema apply --yes ./snapshot.yaml
+  #     npx directus start
+  #   ports:
+  #     - 8056:8055
+  #   depends_on:
+  #     - mariadb
+  #   environment:
+  #     PUBLIC_URL: ${DIRECTUS_MYSQL_URL}
+  #     SECRET: 'my-directus-secret'
+  #     KEY: b2b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6
+  #     # db settings
+  #     DB_CLIENT: 'mysql'
+  #     DB_HOST: 'mariadb'
+  #     DB_PORT: '3306'
+  #     DB_DATABASE: 'mydb'
+  #     DB_USER: 'root'
+  #     DB_PASSWORD: 'dbpass'
+  #     # Admin settings if no database seed is used
+  #     ADMIN_EMAIL: admin@example.com
+  #     ADMIN_PASSWORD: admin
+
+volumes:
+  postgres:
+  mariadb:
