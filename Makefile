@@ -37,12 +37,6 @@ stop: ## Stop directus and dev server
 .PHONY: reset
 reset: ## Prune volumes and clean built packages and examples
 	@docker volume prune -f
-	@pnpm run clean
-	@rm -rf ./examples/nuxt/.nuxt
-
-.PHONY: logs
-logs: ## Show logs of packages
-	@pnpm exec pm2 logs packages --lines 100
 
 .PHONY: ssh
 ssh: ## Connect to gitpod env with SSH.
