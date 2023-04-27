@@ -1,14 +1,18 @@
 # GDPR – Granular Directus Permissions Resolver
 
-Directus Permissions are administered and displayed per role. But what if you need to check WHO
+A CLI that helps you wrangle hundreds Directus permissions.
+
+Directus Permissions are administered and displayed per role. But what if you verify WHO
 has access to a specific column? What if you have hundreds of roles and need to change access
 to a new column in a specific way?
 
+The goal is to have a tool that can be used in dev envs and CI/CD.
+
 ## Limitations
 
-This tool doesn't have a security audit. Do not use in production.
-
-GDPR uses sqlx for connecting to databases. It supports Postgres, MySQL, SQLite and MSSQL.
+* GDPR is pre-alpha
+* This tool doesn't have a security audit. Use in your dev env only.
+* GDPR uses SeaORM, which supports Postgres, MySQL and SQLite.
 
 ## How to
 
@@ -36,7 +40,13 @@ Commit the permissions yaml to git or test if the permissions are reflected by r
 If you want to update only specific columns, because you're quickly iterating and in a dev env:
 
 ```bash
-gdpr patch -u postgres://user:pwd@localhost:5432/mydb --field table.column '{ "*_role": { "read": "ALL", "create": "ALL", "update": "ALL", "delete": "ALL" } }'
+gdpr patch -u postgres://user:pwd@localhost:5432/mydb --field table '{ "*_role": { "read": "ALL", "create": "ALL", "update": "ALL", "delete": "ALL" } }'
+```
+
+or
+
+```bash
+gdpr patch -u postgres://user:pwd@localhost:5432/mydb --field table.column '{ "*_role": "ALL" }'
 ```
 
 You can match roles with regex. In the above example `"*_role"` matches all roles that have the

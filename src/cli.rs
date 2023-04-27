@@ -41,9 +41,9 @@ pub enum DbClient {
 
 #[derive(Parser, Debug)]
 pub struct CliArgs {
-    #[arg(short = 'c', long, default_value_t = String::from("postgres"))]
-    pub client: String,
-
     #[arg(short = 'u', long, default_value_t = String::from("postgres://dbuser:dbpass@localhost:54322/mydb"))]
     pub url: String,
+
+    #[arg(short = 'o', long, default_value_t = String::from("json"))]
+    pub output: String,
 }
