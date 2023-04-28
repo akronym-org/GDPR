@@ -22,13 +22,16 @@ pub enum Command {
 #[derive(Parser, Debug)]
 pub struct Dump {
     #[clap(flatten)]
-    pub args: CliArgs,
+    pub global_args: GlobalArgs,
+
+    #[clap(flatten)]
+    pub dump_args: DumpArgs,
 }
 
 #[derive(Parser, Debug)]
 pub struct Replace {
     #[clap(flatten)]
-    args: CliArgs,
+    args: GlobalArgs,
 }
 
 #[derive(Parser, Debug)]
@@ -40,10 +43,19 @@ pub enum DbClient {
 }
 
 #[derive(Parser, Debug)]
-pub struct CliArgs {
+pub struct GlobalArgs {
     #[arg(short = 'u', long, default_value_t = String::from("postgres://dbuser:dbpass@localhost:54322/mydb"))]
     pub url: String,
 
     #[arg(short = 'o', long, default_value_t = String::from("json"))]
     pub output: String,
+}
+
+#[derive(Parser, Debug)]
+pub struct DumpArgs {
+    #[arg(short = 'f', long)]
+    pub field: Option<String>,
+
+    #[arg(short = 't', long)]
+    pub table: Option<String>,
 }

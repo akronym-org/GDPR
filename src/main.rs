@@ -1,12 +1,14 @@
 use clap::Parser;
 use cli::{Cli, Command};
-// use dump::{handle_dump, DumpArgs};
+use crate::dump::{DumpOptions, handle_dump};
+
 use futures::executor::block_on;
 
 
 pub mod cli;
 pub mod dump;
 pub mod entities;
+pub mod utils;
 pub mod test;
 
 fn main() {
@@ -14,9 +16,9 @@ fn main() {
     // println!("{:#?}", args);
 
     match args.command {
-        Command::Dump(dump_args) => {
-            let dump_args: dump::DumpArgs = dump_args.args.into();
-            if let Err(err) = block_on(dump::handle_dump(dump_args)) {
+        Command::Dump(args) => {
+            let options = DumpOptions::from(args);
+            if let Err(err) = block_on(dump::handle_dump(options)) {
                 panic!("{}", err);
             }
         }

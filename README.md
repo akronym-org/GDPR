@@ -11,7 +11,7 @@ The goal is to have a tool that can be used in dev envs and CI/CD.
 ## Limitations
 
 * GDPR is pre-alpha
-* This tool doesn't have a security audit. Use in your dev env only.
+* This tool doesn't have a security audit. Use in dev only.
 * GDPR uses SeaORM, which supports Postgres, MySQL and SQLite.
 
 ## How to
