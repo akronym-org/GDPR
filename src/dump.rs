@@ -12,10 +12,21 @@ pub struct DumpOptions {
     field: Option<String>,
 }
 
-impl DumpOptions {
-    fn unpack_table_field(&self) {
-    }
-}
+// impl FieldTableArgs for DumpOptions {
+//     fn field(&mut self) -> &mut Option<String> {
+//         &mut self.field
+//     }
+//     fn table(&mut self) -> &mut Option<String> {
+//         &mut self.table
+//     }
+// }
+
+// impl FieldTableArgs for MyStruct {
+//     fn field_name(&self) -> &str {
+//         &self.field_name
+//     }
+// }
+
 
 impl From<Dump> for DumpOptions {
     fn from(dump: Dump) -> Self {
@@ -60,6 +71,7 @@ impl From<Dump> for DumpOptions {
 }
 
 pub async fn handle_dump(args: DumpOptions) -> Result<Vec<directus_permissions::Model>, DbErr> {
+    // args.test_me_round();
     let db = Database::connect(args.url).await?;
     let permissions: Vec<directus_permissions::Model> = directus_permissions::Entity::find()
         .filter(

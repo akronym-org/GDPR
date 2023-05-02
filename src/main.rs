@@ -18,7 +18,7 @@ fn main() {
     match args.command {
         Command::Dump(args) => {
             let options = DumpOptions::from(args);
-            if let Err(err) = block_on(dump::handle_dump(options)) {
+            if let Err(err) = block_on(handle_dump(options)) {
                 panic!("{}", err);
             }
         }
