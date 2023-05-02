@@ -1,13 +1,12 @@
-use crate::cli::{Dump, DumpArgs, GlobalArgs};
-use crate::entities::directus_permissions;
-use crate::entities::{prelude::*, *};
+use crate::cli::{Dump, DumpArgs, GlobalArgs, OutputFormat};
+use crate::entities::*;
 use crate::utils;
 use sea_orm::*;
 
 #[derive(Debug)]
 pub struct DumpOptions {
     url: String,
-    output: String,
+    output: OutputFormat,
     table: Option<String>,
     field: Option<String>,
 }
@@ -81,7 +80,18 @@ pub async fn handle_dump(args: DumpOptions) -> Result<Vec<directus_permissions::
         )
         .all(&db)
         .await?;
-    let show = serde_json::to_string_pretty(&permissions).unwrap();
+
+    let show: String;
+    if args.output == OutputFormat::Yaml {
+        show = serde_yaml::to_string(&permissions).unwrap();
+    } else if args.output == OutputFormat::Json {
+        show = serde_json::to_string_pretty(&permissions).unwrap();
+    } else if args.output == OutputFormat::Pretty {
+        panic!("Pretty is not yet implemented. Choose either json or yaml.")
+    } else {
+        panic!("Choose either json or yaml.")
+    }
+
     println!("{:#}", show);
     return Ok(permissions);
 }
