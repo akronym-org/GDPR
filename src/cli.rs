@@ -78,7 +78,7 @@ impl str::FromStr for OutputFormat {
             YAML_FORMAT => Ok(OutputFormat::Yaml),
             PRETTY_FORMAT => Ok(OutputFormat::Pretty),
             _ => Err(format!(
-                "Unknown output format. Choose {}, {} or {} : {}",
+                "Unknown output format. Choose `{}`, `{}` or `{}` : {}",
                 JSON_FORMAT, YAML_FORMAT, PRETTY_FORMAT, s
             )),
         }

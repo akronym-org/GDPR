@@ -45,10 +45,9 @@ impl From<Dump> for DumpOptions {
                 (t, Some(f)) => {
                     if table.is_some() {
                         panic!(concat!(
-                            "You cannot use --field with dot notation (e.g.: `--field ",
-                            "table_name.field_name`) together with option --table. ",
-                            "Either use field with a simple field_name `--field field_name` ",
-                            "or don't use --table"
+                            "You cannot use `--field` with dot notation (e.g.: table_name.field_name) ",
+                            "in combination with `--table`. Either use --field with a simple field name ",
+                            "e.g.: `--field field_name` or don't use --table."
                         ));
                     }
                     table = Some(t.to_owned());
