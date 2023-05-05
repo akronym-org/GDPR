@@ -1,6 +1,6 @@
 use clap::Parser;
-use std::str;
 use std::fmt;
+use std::str;
 
 #[derive(Parser)]
 #[command(
@@ -52,7 +52,7 @@ pub enum DbClient {
 pub enum OutputFormat {
     Json,
     Yaml,
-    Pretty
+    Pretty,
 }
 
 const JSON_FORMAT: &str = "json";

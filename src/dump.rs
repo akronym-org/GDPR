@@ -1,5 +1,6 @@
 use crate::cli::{Dump, DumpArgs, GlobalArgs, OutputFormat};
 use crate::entities::*;
+use crate::manifest;
 use crate::utils;
 use indexmap::IndexMap;
 use sea_orm::*;
@@ -58,24 +59,22 @@ impl From<Dump> for DumpOptions {
     }
 }
 
-#[derive(Clone)]
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DumpOperation {
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct Rule {
     roles: Vec<String>,
     permissions: JsonValue,
     validation: JsonValue,
 }
-#[derive(Clone)]
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DumpField {
-    create: Vec<DumpOperation>,
-    read: Vec<DumpOperation>,
-    update: Vec<DumpOperation>,
-    delete: Vec<DumpOperation>,
-    share: Vec<DumpOperation>,
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct Field {
+    create: Vec<Rule>,
+    read: Vec<Rule>,
+    update: Vec<Rule>,
+    delete: Vec<Rule>,
+    share: Vec<Rule>,
 }
 
-impl DumpField {
+impl Field {
     fn new() -> Self {
         Self {
             create: Vec::new(),
@@ -89,10 +88,9 @@ impl DumpField {
     pub fn iter_keys() -> impl Iterator<Item = &'static str> {
         return ["create", "read", "update", "delete", "share"].into_iter();
     }
-
 }
 
-type DumpAll = HashMap<String, DumpField>;
+type DumpAll = HashMap<String, Field>;
 
 #[derive(Serialize, Deserialize)]
 struct DataWithVersion {
@@ -102,11 +100,11 @@ struct DataWithVersion {
 }
 
 /// Deduplicate permissions and validations
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `input` - An input JsonValue
-pub fn deduplicate(input: Vec<DumpOperation>) -> Vec<DumpOperation> {
+pub fn deduplicate(input: Vec<Rule>) -> Vec<Rule> {
     todo!()
 }
 
@@ -118,15 +116,17 @@ pub fn deduplicate(input: Vec<DumpOperation>) -> Vec<DumpOperation> {
 /// * `permissions` - A reference to a vector of `directus_permissions::Model` objects
 ///   containing the permissions to be organized.
 pub fn organize_field(args: &DumpOptions, input: &Vec<directus_permissions::Model>) -> DumpAll {
+    // TODO: panics if no --field option was specified.
+    // Eventually this should loop over all fields in directus_fields of the collection.
+    let field_name = args
+        .field
+        .clone()
+        .expect("You must specify a `--field` option as of now.");
 
-    // TODO: unwraps to `id` by default.
-    // It should loop over all fields in directus_fields of the collection.
-    let field_name = args.field.clone().unwrap_or("id".to_owned());
-
-    let mut field = DumpField::new();
+    let mut field = Field::new();
 
     // loop over each action
-    for key in DumpField::iter_keys() {
+    for key in Field::iter_keys() {
         let role_permission = input
             .iter()
             .filter(|permission| permission.action == key)
@@ -149,7 +149,7 @@ pub fn organize_field(args: &DumpOptions, input: &Vec<directus_permissions::Mode
             .collect::<Vec<_>>();
 
         for permission in role_permission {
-            let dump_operation = DumpOperation {
+            let dump_operation = Rule {
                 roles: vec![permission["roles"].as_str().unwrap().to_owned()],
                 permissions: permission["permissions"].clone(),
                 validation: permission["validation"].clone(),
@@ -170,7 +170,6 @@ pub fn organize_field(args: &DumpOptions, input: &Vec<directus_permissions::Mode
     dump_all.insert(field_name, field);
 
     return dump_all;
-
 }
 
 /// Displays the organized permissions dump in a human-readable format.
@@ -181,7 +180,7 @@ pub fn organize_field(args: &DumpOptions, input: &Vec<directus_permissions::Mode
 /// * `permissions` - a reference to the raw permissions.
 pub fn output_dump(output: &OutputFormat, data: &DumpAll) {
     let data_with_version = DataWithVersion {
-        version: utils::manifest_version(),
+        version: manifest::get_version(),
         data: data.clone(),
     };
 

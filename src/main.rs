@@ -1,15 +1,15 @@
+use crate::dump::{dump_entrypoint, DumpOptions};
 use clap::Parser;
 use cli::{Cli, Command};
-use crate::dump::{DumpOptions, dump_entrypoint};
 
 use futures::executor::block_on;
-
 
 pub mod cli;
 pub mod dump;
 pub mod entities;
-pub mod utils;
+pub mod manifest;
 pub mod test;
+pub mod utils;
 
 fn main() {
     let args = Cli::parse();
@@ -22,6 +22,6 @@ fn main() {
                 panic!("{}", err);
             }
         }
-        Command::Replace(_replace) => { }
+        Command::Replace(_replace) => {}
     }
 }
