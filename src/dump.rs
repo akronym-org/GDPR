@@ -99,21 +99,21 @@ pub fn organize_dump(args: &DumpOptions, permissions: &Vec<directus_permissions:
 /// 
 /// * `args` - A reference to the CLI options.
 /// * `permissions` - a reference to the raw permissions.
-pub fn show_dump(args: &DumpOptions, permissions: &Vec<directus_permissions::Model>) {
-    let show: String;
-    if args.output == OutputFormat::Yaml {
-        show = serde_yaml::to_string(permissions).unwrap();
-    } else if args.output == OutputFormat::Json {
-        show = serde_json::to_string_pretty(permissions).unwrap();
-    } else if args.output == OutputFormat::Pretty {
-        panic!("Pretty is not yet implemented. Choose either json or yaml.")
-    } else {
-        panic!("Choose either json or yaml.")
-    }
+pub fn show_dump(output: &OutputFormat, permissions: &Vec<directus_permissions::Model>) {
+    let show: String = match output {
+        OutputFormat::Yaml => serde_yaml::to_string(permissions).unwrap(),
+        OutputFormat::Json => serde_json::to_string_pretty(permissions).unwrap(),
+        OutputFormat::Pretty => panic!("Pretty is not yet implemented. Choose either json or yaml."),
+    };
 
     println!("{:#}", show);
 }
 
+/// Handle logic for the `dump` command.
+/// 
+/// # Arguments
+/// 
+/// * `args` - A reference to the `dump` specific arguments and user options.
 pub async fn dump_entrypoint(args: &DumpOptions) -> Result<(), DbErr> {
     let db = Database::connect(&args.url).await?;
 
@@ -164,7 +164,7 @@ pub async fn dump_entrypoint(args: &DumpOptions) -> Result<(), DbErr> {
     //     permissions.load_one(directus_roles::Entity, &db).await?;
     // println!("roles {:#?}", roles);
 
-    show_dump(&args, &permissions);
+    show_dump(&args.output, &permissions);
 
     return Ok(());
 }
