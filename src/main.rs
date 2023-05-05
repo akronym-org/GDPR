@@ -1,6 +1,6 @@
 use clap::Parser;
 use cli::{Cli, Command};
-use crate::dump::{DumpOptions, handle_dump};
+use crate::dump::{DumpOptions, dump_entrypoint};
 
 use futures::executor::block_on;
 
@@ -18,12 +18,10 @@ fn main() {
     match args.command {
         Command::Dump(args) => {
             let options = DumpOptions::from(args);
-            if let Err(err) = block_on(handle_dump(options)) {
+            if let Err(err) = block_on(dump_entrypoint(&options)) {
                 panic!("{}", err);
             }
         }
-        Command::Replace(_replace) => {
-            // skip
-        }
+        Command::Replace(_replace) => { }
     }
 }

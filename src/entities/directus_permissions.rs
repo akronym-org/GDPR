@@ -13,9 +13,9 @@ pub struct Model {
     #[serde(skip_serializing)]
     pub collection: String,
     pub action: String,
-    #[serde(skip_serializing)]
+    // #[serde(skip_serializing)]
     pub permissions: Option<Json>,
-    #[serde(skip_serializing)]
+    // #[serde(skip_serializing)]
     pub validation: Option<Json>,
     #[serde(skip_serializing)]
     pub presets: Option<Json>,

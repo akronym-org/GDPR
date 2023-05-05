@@ -78,8 +78,8 @@ impl str::FromStr for OutputFormat {
             YAML_FORMAT => Ok(OutputFormat::Yaml),
             PRETTY_FORMAT => Ok(OutputFormat::Pretty),
             _ => Err(format!(
-                "Unknown output format. Choose `{}`, `{}` or `{}` : {}",
-                JSON_FORMAT, YAML_FORMAT, PRETTY_FORMAT, s
+                "Unknown output format. You used `{}`. Choose one of: `{}`, `{}`, `{}`. Use --help to see a list of all options.",
+                s, JSON_FORMAT, YAML_FORMAT, PRETTY_FORMAT
             )),
         }
     }
@@ -102,41 +102,3 @@ pub struct DumpArgs {
     #[arg(short = 't', long)]
     pub table: Option<String>,
 }
-
-// pub trait FieldTableArgs {
-//     fn field(&mut self) -> &mut Option<String>;
-//     fn table(&mut self) -> &mut Option<String>;
-
-//     // fn test_me_round(&self) {
-//     //     println!("hahahahahal {:#?}", self.field());
-//     // }
-//     /// Read field and table arguments from CLI and unwrap table.field
-//     /// or panic if table is defined twice.
-//     fn unwrap_or_panic(&mut self) {
-//         if let Some(unpacked_field) = self.field() {
-//             let split_table_field = utils::split_one_point_strictly(unpacked_field);
-//             match split_table_field {
-//                 (t, Some(f)) => {
-//                     if self.table().is_some() {
-//                         panic!(concat!(
-//                             "You cannot use --field with dot notation (e.g.: `--field ",
-//                             "table_name.field_name`) together with option --table. ",
-//                             "Either use field with a simple field_name `--field field_name` ",
-//                             "or don't use --table"
-//                         ));
-//                     }
-//                     *self.table() = Some(t.to_owned());
-//                     *self.field() = Some(f.to_owned());
-//                 }
-//                 (f, None) => {
-//                     *self.field() = Some(f.to_owned());
-//                 }
-//             }
-//         }
-//     }
-// }
-
-// Define a generic function that works with both structs
-// pub fn dododo<T: FieldTableArgs>(arg: &mut T) {
-//     arg.test_me_round();
-// }
