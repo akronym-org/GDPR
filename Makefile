@@ -29,6 +29,10 @@ start: ## Start running databases
 	@echo "\033[34mDirectus Mysql:\033[0m ${DIRECTUS_MYSQL_URL}"
 	@echo "Login for Directus: admin@example.com, password: admin\n"
 
+.PHONY: dev
+dev: ## Run the CLI on -f thing.content
+	cargo run -- dump -f 'thing.content' -o yaml	
+
 .PHONY: stop
 stop: ## Stop directus and dev server
 	@docker compose -f database/docker-compose.yaml down

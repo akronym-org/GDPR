@@ -59,45 +59,72 @@ impl From<Dump> for DumpOptions {
 
 #[derive(Serialize, Deserialize)]
 pub struct DumpOperation {
-    pub roles: Vec<String>,
-    pub permissions: String,
-    pub validation: String,
+    roles: Vec<String>,
+    permissions: Vec<HashMap<String, HashMap<String, HashMap<String, String>>>>,
+    validation: Option<Vec<HashMap<String, HashMap<String, String>>>>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct DumpField {
-    pub create: Vec<DumpOperation>,
-    pub read: Vec<DumpOperation>,
-    pub update: Vec<DumpOperation>,
-    pub delete: Vec<DumpOperation>,
-    pub share: Vec<DumpOperation>,
+    create: Vec<DumpOperation>,
+    read: Vec<DumpOperation>,
+    update: Vec<DumpOperation>,
+    delete: Vec<DumpOperation>,
+    share: Vec<DumpOperation>,
 }
+
+impl DumpField {
+    pub fn iter_keys() -> impl Iterator<Item = &'static str> {
+        return ["create", "read", "update", "delete", "share"].into_iter();
+    }
+}
+
 
 type DumpAll = HashMap<String, DumpField>;
 
-/// Organize the permissions data into a structured format.
-///
-/// This function takes a reference to `DumpOptions` and a reference to a vector of
-/// `directus_permissions::Model` objects, and processes them to create a structured
-/// organization of the permissions dump.
+/// Organize the database permissions into GDPR's base format.
 ///
 /// # Arguments
 ///
-/// * `args` - A reference to the CLI options.
+/// * `args` - A reference to the user's settings used by the dump command.
 /// * `permissions` - A reference to a vector of `directus_permissions::Model` objects
 ///   containing the permissions to be organized.
-pub fn organize_dump(args: &DumpOptions, permissions: &Vec<directus_permissions::Model>) {
-    println!("args {:#?}", args);
-    println!("permissions {:#?}", permissions);
+pub fn organize_dump(args: &DumpOptions, input: &Vec<directus_permissions::Model>) {
+    // println!("args {:#?}", args);
+    // println!("permissions {:#?}", input);
 
-    // 1st: get all fields that are required
+    let mut output: DumpAll = HashMap::new();
+
+    // TODO: unwraps to `id` by default.
+    // It should loop over all fields in directus_fields of the collection.
+    // let field_name = args.field.unwrap_or("id".to_owned());
+
+    // loop over each action and collect all roles
+    for key in DumpField::iter_keys() {
+        let roles = input
+            .iter()
+            .filter(|permission| permission.action == key)
+            .map(|permission| {
+                permission.role.clone().unwrap_or("public".to_owned())
+            })
+            .collect::<Vec<String>>();
+
+        // output
+        //     .entry(field_name)
+        //     .or_insert_with(HashMap::new)
+        //     .entry(key)
+        //     .or_insert_with(Vec::new)
+        //     .push(roles);
+        println!("action {}: {:#?}", key, roles);
+    }
+    // println!("output: {:#?}", output);
 }
 
 /// Displays the organized permissions dump in a human-readable format.
 /// 
 /// # Arguments
 /// 
-/// * `args` - A reference to the CLI options.
+/// * `output` - A reference to the user's preferred output format.
 /// * `permissions` - a reference to the raw permissions.
 pub fn show_dump(output: &OutputFormat, permissions: &Vec<directus_permissions::Model>) {
     let show: String = match output {
@@ -142,7 +169,7 @@ pub async fn dump_entrypoint(args: &DumpOptions) -> Result<(), DbErr> {
     // If you build the query as string you get this:
     // ```rust
     // let query = directus_permissions::Entity::find()
-    //     .filter(condition).build(DbBackend::Postgres).to_string();
+    //     .filter(condition.clone()).build(DbBackend::Postgres).to_string();
     // println!("query: {}", query);
     // ```
     // SELECT * FROM "directus_permissions"
@@ -153,11 +180,11 @@ pub async fn dump_entrypoint(args: &DumpOptions) -> Result<(), DbErr> {
     //   OR "directus_permissions"."fields" LIKE '%,field_name'
     //   OR "directus_permissions"."fields" = '*')
     let permissions: Vec<directus_permissions::Model> = directus_permissions::Entity::find()
-        .filter(condition.clone())
+        .filter(condition)
         .all(&db)
         .await?;
 
-    let organized_dump = organize_dump(args, &permissions);
+    let _organized_dump = organize_dump(&args, &permissions);
 
     // Toggled off: We'll replace role ids with role names later
     // let roles: Vec<Option<directus_roles::Model>> =

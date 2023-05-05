@@ -9,13 +9,12 @@ pub struct Model {
     #[serde(skip_serializing)]
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub role: Option<Uuid>,
+    #[sea_orm(select_as = "text", save_as = "uuid")]
+    pub role: Option<String>,
     #[serde(skip_serializing)]
     pub collection: String,
     pub action: String,
-    // #[serde(skip_serializing)]
     pub permissions: Option<Json>,
-    // #[serde(skip_serializing)]
     pub validation: Option<Json>,
     #[serde(skip_serializing)]
     pub presets: Option<Json>,

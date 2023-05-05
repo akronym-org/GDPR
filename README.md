@@ -1,43 +1,62 @@
 # GDPR – Granular Directus Permissions Resolver
 
-A CLI that helps you wrangle hundreds of Directus permissions.
+A CLI that helps you wrangle & audit hundreds of Directus permissions.
 
 Directus Permissions are administered and displayed per role. But what if you need verify WHO
 has access to a specific column? What if you have hundreds of roles and need to change access
 to a new column in a specific way?
 
-The goal is to have a tool that can be used in dev envs and CI/CD.
+GDPR's goals are:
+
+* allows you to quickly iterate in dev
+* can be used for tests CI/CD
+* makes auditing Directus deployments easier
 
 ## Limitations
 
+* Currently only works with Postgres.
 * GDPR is pre-alpha. Even `gdpr dump` doesn't work properly yet.
+* You must specify a table and a field.
 * This tool doesn't have a security audit. Don't use it!
 * GDPR uses SeaORM, which supports Postgres, MySQL and SQLite.
 
-## Reading data
+## Auditing permissions
 
-Connect to DB `gdpr dump -u postgres://user:pwd@localhost:5432/mydb` and display permissions as JSON.
+Connect to your database
 
-Dump to yaml `gdpr dump -u postgres://user:pwd@localhost:5432/mydb -o yaml`.
+```bash
+gdpr dump -u postgres://user:pwd@localhost:5432/mydb
+```
 
-You can save permissions by redirecting to a file.
-`gdpr dump -u postgres://user:pwd@localhost:5432/mydb -o yaml > permissions.yaml`
+and display all permissions as JSON.
 
-Use `--table table_name` or `--t` for selecting one specific table with all its columns.
+Dump your permissions to yaml with `-o yaml`. You can save your output by redirecting to a file.
 
-Use `--field table.column` or `--f` for selecting one specific column.
+```bash
+gdpr dump -o yaml > permissions.yaml
+```
 
-Combining both `--table` and `--field` means, you can't use dot notation in the field option.
+### Inspect specific tables & columns
 
+Audit one specific column like this:
+
+```bash
 `gdpr dump -t table_name -f field_name`
+```
 
-This will output the permissions for table_name.field_name and is the same as:
+Use only `--table table_name` or `--t` for selecting all columns of a table. (TODO: support wildcards like `directus_*`)
 
-`gdpr dump -f table_name.field_name`
+You can also use:
+
+```bash
+gdpr dump -f table_name.field_name
+```
+
+You cannot specify `--table some_table` and use the dot-notation in `--field`.
 
 ### Output format
 
-GDPR will deduplicate same permissions and validations for multiple roles.
+GDPR will deduplicate the same permissions and validations for multiple roles.
 
 The format used by GDPR looks like this (for table_name.field_name)
 
@@ -46,7 +65,7 @@ The format used by GDPR looks like this (for table_name.field_name)
   "field_name": {
     "create": [
       {
-        "roles": [ "role_name" ],
+        "roles": [ "role_name", "role_name_2" ],
         "_and": [
           {
             "field_name": {
@@ -59,7 +78,7 @@ The format used by GDPR looks like this (for table_name.field_name)
         ]
       },
     ],
-    "read": [ 
+    "read": [
       {
         "roles": [ "role_name" ],
         "_and": [{
@@ -95,7 +114,9 @@ Or as yaml
 ```yaml
 field_name:
   create:
-  - roles: role_name
+  - roles:
+    - role_name
+    - role_name_2
     permissions:
     - _and:
       - field_name:
@@ -103,13 +124,15 @@ field_name:
       - id:
         - lt: 50
   read:
-  - roles: role_name
+  - roles:
+    - role_name
     permissions:
     - _and:
       - id:
         - lt: 50
   update:
-  - roles: role_name
+  - roles:
+    - role_name
     permissions:
     - _and:
       - id:
@@ -126,20 +149,20 @@ If you use option `--simple` (TODO: find better option name) you can simply disp
 
 ```yaml
 field_name:
-  create: role_name
+  create: role_name, role_name_2
   read: role_name
   update: role_name
   delete:
   share:
 ```
 
-## Updating permissions
+## ~~Updating permissions~~
 
-You can also update permissions.
+You can also (**not yet**) update permissions.
 In order to replace all permissions with an updated permissions set use
 
 ```bash
-gdpr replace -u postgres://user:pwd@localhost:5432/mydb < permissions.yml
+gdpr replace < permissions.yml
 ```
 
 Commit the permissions yaml to git or test if the permissions are reflected by reality in CI/CD.
@@ -147,13 +170,13 @@ Commit the permissions yaml to git or test if the permissions are reflected by r
 If you want to update only specific columns, because you're quickly iterating and in a dev env:
 
 ```bash
-gdpr patch -u postgres://user:pwd@localhost:5432/mydb --field table '{ "*_role": { "read": "ALL", "create": "ALL", "update": "ALL", "delete": "ALL" } }'
+gdpr patch -f table.column '{ "*_role": { "read": "ALL", "create": "ALL", "update": "ALL" } }'
 ```
 
 or
 
 ```bash
-gdpr patch -u postgres://user:pwd@localhost:5432/mydb --field table.column '{ "*_role": "ALL" }'
+gdpr patch -f table.column '{ "*_role": "ALL" }'
 ```
 
 You can match roles with regex. In the above example `"*_role"` matches all roles that have the
@@ -164,17 +187,18 @@ A short version for granting all access to all roles is `{ "*": { "*": "ALL" } }
 You can also update from a file
 
 ```bash
-gdpr patch -u postgres://user:pwd@localhost:5432/mydb --field table.column < patch.yml
+gdpr patch -f table.column < patch.yml
 ```
 
 ### Env vars
 
-If you want to avoid specifying connection details `-h localhost -p 5432 -U postgres`, you can:
+If you want to avoid specifying connection details `--url postgres://user:pwd@localhost:5432/mydb`
+every time, you can:
 
-* Set env var
-* Set an .env file
-* Call `gdpr` with env var prepended
-* You can use env var DATABASE_URL
+* Set env vars
+* Use an .env file
+
+Additionally, you can call GDPR with a prepended env var. Currently it's `DATABASE_URL`.
 
 ```bash
 DATABASE_URL=postgres://user:pwd@localhost:5432/mydb gdpr dump
