@@ -1,6 +1,7 @@
 use crate::cli::{Dump, DumpArgs, GlobalArgs, OutputFormat};
 use crate::entities::*;
 use crate::utils;
+use indexmap::IndexMap;
 use sea_orm::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -57,14 +58,15 @@ impl From<Dump> for DumpOptions {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DumpOperation {
     roles: Vec<String>,
-    permissions: Vec<HashMap<String, HashMap<String, HashMap<String, String>>>>,
-    validation: Option<Vec<HashMap<String, HashMap<String, String>>>>,
+    permissions: JsonValue,
+    validation: JsonValue,
 }
-
-#[derive(Serialize, Deserialize)]
+#[derive(Clone)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DumpField {
     create: Vec<DumpOperation>,
     read: Vec<DumpOperation>,
@@ -74,13 +76,39 @@ pub struct DumpField {
 }
 
 impl DumpField {
+    fn new() -> Self {
+        Self {
+            create: Vec::new(),
+            read: Vec::new(),
+            update: Vec::new(),
+            delete: Vec::new(),
+            share: Vec::new(),
+        }
+    }
+
     pub fn iter_keys() -> impl Iterator<Item = &'static str> {
         return ["create", "read", "update", "delete", "share"].into_iter();
     }
+
 }
 
-
 type DumpAll = HashMap<String, DumpField>;
+
+#[derive(Serialize, Deserialize)]
+struct DataWithVersion {
+    version: String,
+    #[serde(flatten)]
+    data: DumpAll,
+}
+
+/// Deduplicate permissions and validations
+/// 
+/// # Arguments
+/// 
+/// * `input` - An input JsonValue
+pub fn deduplicate(input: Vec<DumpOperation>) -> Vec<DumpOperation> {
+    todo!()
+}
 
 /// Organize the database permissions into GDPR's base format.
 ///
@@ -89,89 +117,125 @@ type DumpAll = HashMap<String, DumpField>;
 /// * `args` - A reference to the user's settings used by the dump command.
 /// * `permissions` - A reference to a vector of `directus_permissions::Model` objects
 ///   containing the permissions to be organized.
-pub fn organize_dump(args: &DumpOptions, input: &Vec<directus_permissions::Model>) {
-    // println!("args {:#?}", args);
-    // println!("permissions {:#?}", input);
-
-    let mut output: DumpAll = HashMap::new();
+pub fn organize_field(args: &DumpOptions, input: &Vec<directus_permissions::Model>) -> DumpAll {
 
     // TODO: unwraps to `id` by default.
     // It should loop over all fields in directus_fields of the collection.
-    // let field_name = args.field.unwrap_or("id".to_owned());
+    let field_name = args.field.clone().unwrap_or("id".to_owned());
 
-    // loop over each action and collect all roles
+    let mut field = DumpField::new();
+
+    // loop over each action
     for key in DumpField::iter_keys() {
-        let roles = input
+        let role_permission = input
             .iter()
             .filter(|permission| permission.action == key)
             .map(|permission| {
-                permission.role.clone().unwrap_or("public".to_owned())
+                let mut map = IndexMap::new();
+                map.insert(
+                    "roles".to_owned(),
+                    JsonValue::String(permission.role.clone().unwrap_or("public".to_owned())),
+                );
+                map.insert(
+                    "permissions".to_owned(),
+                    permission.permissions.clone().unwrap_or(JsonValue::Null),
+                );
+                map.insert(
+                    "validation".to_owned(),
+                    permission.validation.clone().unwrap_or(JsonValue::Null),
+                );
+                map
             })
-            .collect::<Vec<String>>();
+            .collect::<Vec<_>>();
 
-        // output
-        //     .entry(field_name)
-        //     .or_insert_with(HashMap::new)
-        //     .entry(key)
-        //     .or_insert_with(Vec::new)
-        //     .push(roles);
-        println!("action {}: {:#?}", key, roles);
+        for permission in role_permission {
+            let dump_operation = DumpOperation {
+                roles: vec![permission["roles"].as_str().unwrap().to_owned()],
+                permissions: permission["permissions"].clone(),
+                validation: permission["validation"].clone(),
+            };
+
+            match key {
+                "create" => field.create.push(dump_operation),
+                "read" => field.read.push(dump_operation),
+                "update" => field.update.push(dump_operation),
+                "delete" => field.delete.push(dump_operation),
+                "share" => field.share.push(dump_operation),
+                _ => (),
+            }
+        }
     }
-    // println!("output: {:#?}", output);
+
+    let mut dump_all = HashMap::new();
+    dump_all.insert(field_name, field);
+
+    return dump_all;
+
 }
 
 /// Displays the organized permissions dump in a human-readable format.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `output` - A reference to the user's preferred output format.
 /// * `permissions` - a reference to the raw permissions.
-pub fn show_dump(output: &OutputFormat, permissions: &Vec<directus_permissions::Model>) {
+pub fn output_dump(output: &OutputFormat, data: &DumpAll) {
+    let data_with_version = DataWithVersion {
+        version: utils::manifest_version(),
+        data: data.clone(),
+    };
+
     let show: String = match output {
-        OutputFormat::Yaml => serde_yaml::to_string(permissions).unwrap(),
-        OutputFormat::Json => serde_json::to_string_pretty(permissions).unwrap(),
-        OutputFormat::Pretty => panic!("Pretty is not yet implemented. Choose either json or yaml."),
+        OutputFormat::Yaml => serde_yaml::to_string(&data_with_version).unwrap(),
+        OutputFormat::Json => serde_json::to_string_pretty(&data_with_version).unwrap(),
+        OutputFormat::Pretty => {
+            panic!("Pretty is not yet implemented. Choose either json or yaml.")
+        }
     };
 
     println!("{:#}", show);
 }
 
 /// Handle logic for the `dump` command.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `args` - A reference to the `dump` specific arguments and user options.
 pub async fn dump_entrypoint(args: &DumpOptions) -> Result<(), DbErr> {
     let db = Database::connect(&args.url).await?;
 
-    // Build the db query where clause
+    // Build the db query's where clause
     let mut condition = Condition::all();
     if let Some(ref table) = args.table {
         condition = condition.add(directus_permissions::Column::Collection.eq(table));
     }
     if let Some(ref field) = args.field {
-        condition = condition
-            .add(
-                Condition::any()
-                    // if `field` matches exactly
-                    .add(directus_permissions::Column::Fields.eq(field))
-                    // if `field` is in the middle of a csv of multiple fields
-                    .add(directus_permissions::Column::Fields.like(("%,".to_owned() + field + ",%").as_str()))
-                    // if `field` is at the start
-                    .add(directus_permissions::Column::Fields.like((field.to_owned() + ",%").as_str()))
-                    // if `field` is at the end
-                    .add(directus_permissions::Column::Fields.like(("%,".to_owned() + field).as_str()))
-                    // if it's about all fields of a table directus uses a wildcard
-                    .add(directus_permissions::Column::Fields.eq("*"))
-            )
+        condition = condition.add(
+            Condition::any()
+                // if `field` matches exactly
+                .add(directus_permissions::Column::Fields.eq(field))
+                // if `field` is in the middle of a csv of multiple fields
+                .add(
+                    directus_permissions::Column::Fields
+                        .like(("%,".to_owned() + field + ",%").as_str()),
+                )
+                // if `field` is at the start
+                .add(directus_permissions::Column::Fields.like((field.to_owned() + ",%").as_str()))
+                // if `field` is at the end
+                .add(directus_permissions::Column::Fields.like(("%,".to_owned() + field).as_str()))
+                // if it's about all fields of a table directus uses a wildcard
+                .add(directus_permissions::Column::Fields.eq("*")),
+        )
     }
 
-    // If you build the query as string you get this:
+    // Building the query as string ...
     // ```rust
     // let query = directus_permissions::Entity::find()
     //     .filter(condition.clone()).build(DbBackend::Postgres).to_string();
     // println!("query: {}", query);
     // ```
+    //
+    // Returns this:
     // SELECT * FROM "directus_permissions"
     // WHERE "directus_permissions"."collection" = 'table_name'
     // AND ("directus_permissions"."fields" = 'field_name'
@@ -184,14 +248,14 @@ pub async fn dump_entrypoint(args: &DumpOptions) -> Result<(), DbErr> {
         .all(&db)
         .await?;
 
-    let _organized_dump = organize_dump(&args, &permissions);
+    let organized_dump = organize_field(&args, &permissions);
 
     // Toggled off: We'll replace role ids with role names later
     // let roles: Vec<Option<directus_roles::Model>> =
     //     permissions.load_one(directus_roles::Entity, &db).await?;
     // println!("roles {:#?}", roles);
 
-    show_dump(&args.output, &permissions);
+    output_dump(&args.output, &organized_dump);
 
     return Ok(());
 }

@@ -65,7 +65,12 @@ The format used by GDPR looks like this (for table_name.field_name)
   "field_name": {
     "create": [
       {
-        "roles": [ "role_name", "role_name_2" ],
+        "roles": [ "public" ],
+        "permissions": {},
+        "validation": {},
+      },
+      {
+        "roles": [ "role_name" ],
         "_and": [
           {
             "field_name": {
@@ -170,13 +175,13 @@ Commit the permissions yaml to git or test if the permissions are reflected by r
 If you want to update only specific columns, because you're quickly iterating and in a dev env:
 
 ```bash
-gdpr patch -f table.column '{ "*_role": { "read": "ALL", "create": "ALL", "update": "ALL" } }'
+gdpr patch -f table.column --role '*_role' '{ "read": "ALL", "create": "ALL", "update": "ALL" }'
 ```
 
-or
+If you don't mind also adding permissions for `delete` and `share` you could also simply run:
 
 ```bash
-gdpr patch -f table.column '{ "*_role": "ALL" }'
+gdpr patch -f table.column --role '*_role' ALL
 ```
 
 You can match roles with regex. In the above example `"*_role"` matches all roles that have the

@@ -1,3 +1,5 @@
+use cargo_metadata::MetadataCommand;
+
 /// Split a string with at most one point `.`
 ///
 /// Always return a tuple. If no point is found, return a string splice
@@ -23,4 +25,20 @@ pub fn split_one_point_strictly(string: &str) -> (&str, Option<&str>) {
     } else {
         panic!("{} has too many points.", string)
     }
+}
+
+
+/// Get GDPR Manifest Version from Cargo.toml
+pub fn manifest_version() -> String {
+    let metadata = MetadataCommand::new().exec().unwrap();
+    let manifest_version = metadata
+        .root_package()
+        .unwrap()
+        .metadata
+        .get("manifest_version")
+        .expect("manifest_version not found in Cargo.toml")
+        .as_str()
+        .expect("manifest_version is not a string");
+
+    return manifest_version.to_owned();
 }
