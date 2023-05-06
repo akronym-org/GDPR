@@ -3,32 +3,38 @@
 A CLI that helps you wrangle & audit hundreds of Directus permissions.
 
 Directus Permissions are administered and displayed per role. But what if you need to verify WHO
-has access to a specific column? What if you have hundreds of roles and need to change access
-to a new column in a specific way?
+has access to a specific column? What if you have 20 roles and need to change specific access
+to a new column?
 
 GDPR's goals are:
 
-* allows you to quickly iterate in dev
-* verify permissions during CI/CD
-* makes auditing Directus deployments easier
+* Quickly iterate in your dev env
+* Verify permissions during/after deployment in your pipeline
+* Audit Directus deployments easier
 
 ## Limitations
 
 * Currently only works with Postgres.
-* GDPR is pre-alpha. Only `dump` works.
+* GDPR is pre-alpha. Only `dump` works (sort of).
 * You must specify a table and a field.
 * This tool doesn't have a security audit. Don't use it!
 * GDPR uses SeaORM, which supports Postgres, MySQL and SQLite.
 
+## How to
+
+The available features are (going to be):
+
+* show/save permissions per table, per field, with wildcard
+* `replace` / `patch`: update permissions, granular/universal, with wildcards
+* create knex migrations you can put into your `extensions/migrations
+
 ## Auditing permissions
 
-Connect to your database
+Connect to your database and output all permissions as JSON.
 
 ```bash
 gdpr dump -u postgres://user:pwd@localhost:5432/mydb
 ```
-
-and display all permissions as JSON.
 
 Dump your permissions to yaml with `-o yaml`. You can save your output by redirecting to a file.
 
@@ -38,25 +44,29 @@ gdpr dump -o yaml > permissions.yaml
 
 ### Inspect specific tables & columns
 
-Audit one specific column like this:
+Dump a specific column like this:
 
 ```bash
-`gdpr dump -t table_name -f field_name`
+gdpr dump -t table_name -f field_name
 ```
 
-Use only `--table table_name` or `--t` for selecting all columns of a table. (TODO: support wildcards like `directus_*`)
-
-You can also use:
+or
 
 ```bash
 gdpr dump -f table_name.field_name
 ```
 
-You cannot specify `--table some_table` and use the dot-notation in `--field`.
+Use only `--table table_name` or `--t` for selecting all columns of a table.
+
+(TODO:) Support wildcards like in --table or --field names.
+
+```bash
+gdpr dump -f table_*.field_name
+```
 
 ### Output format
 
-GDPR will deduplicate the same permissions and validations for multiple roles.
+GDPR deduplicates equal permissions and validations if they belong to multiple roles.
 
 The format used by GDPR looks like this (for table_name.field_name)
 
