@@ -5,6 +5,7 @@ use cli::{Cli, Command};
 use futures::executor::block_on;
 
 pub mod cli;
+pub mod dedupe;
 pub mod dump;
 pub mod entities;
 pub mod manifest;

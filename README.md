@@ -2,14 +2,14 @@
 
 A CLI that helps you wrangle & audit hundreds of Directus permissions.
 
-Directus Permissions are administered and displayed per role. But what if you need verify WHO
+Directus Permissions are administered and displayed per role. But what if you need to verify WHO
 has access to a specific column? What if you have hundreds of roles and need to change access
 to a new column in a specific way?
 
 GDPR's goals are:
 
 * allows you to quickly iterate in dev
-* can be used for tests CI/CD
+* verify permissions during CI/CD
 * makes auditing Directus deployments easier
 
 ## Limitations
