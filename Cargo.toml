@@ -29,3 +29,4 @@ async-std = { version = "1.9", features = [ "attributes", "tokio1" ] }
 sea-orm = { version = "0.11.3", features = [ "sqlx-all", "runtime-async-std-native-tls" ] }
 indexmap = "1.9.3"
 cargo_metadata = "0.15.4"
+regex = "1.8.1"

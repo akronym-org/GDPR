@@ -1,4 +1,5 @@
 use clap::Parser;
+use regex::Regex;
 use std::fmt;
 use std::str;
 
@@ -96,9 +97,14 @@ pub struct GlobalArgs {
 
 #[derive(Parser)]
 pub struct DumpArgs {
-    #[arg(short = 'f', long)]
+    #[arg(short = 'f', long, value_parser = remove_whitespace)]
     pub field: Option<String>,
 
     #[arg(short = 't', long)]
     pub table: Option<String>,
+}
+
+fn remove_whitespace(s: &str) -> Result<String, String> {
+    let trimmed = s.split(',').map(|word| word.trim().to_owned()).collect::<Vec<String>>().join(",");
+    Ok(trimmed.to_owned())
 }

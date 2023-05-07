@@ -3,6 +3,7 @@ use crate::database;
 use crate::entities::*;
 use crate::manifest;
 use crate::utils;
+use crate::wildcard;
 use indexmap::IndexMap;
 use sea_orm::*;
 use serde::{Deserialize, Serialize};
@@ -190,6 +191,8 @@ pub fn organize_fields(args: &DumpOptions, input: &Vec<directus_permissions::Mod
 pub fn output_dump(output: &OutputFormat, data: &DumpAll) {
     let data_with_version = DataWithVersion {
         version: manifest::get_version(),
+        // TODO: #low-priority
+        // avoid using clone()
         data: data.clone(),
     };
 
@@ -239,9 +242,25 @@ fn build_field_condition(fields: &Vec<String>) -> Condition {
     return condition;
 }
 
-#[derive(FromQueryResult, Debug, Serialize, Deserialize)]
-struct LimitedFieldsQuery {
-    field: String,
+/// Validate fields or panic
+pub fn validate_fields_or_panic(
+    to_be_checked: &Vec<String>,
+    required: &Vec<String>,
+    collection: &str,
+) {
+    for check in to_be_checked {
+        if !required.contains(&check) {
+            panic!(
+                concat!(
+                    "You requested permissions for a field, that is unknown to Directus ",
+                    "because it can't be found in directus_fields.\n",
+                    "Collection: {}\n",
+                    "Field: {} <-- does not exist!"
+                ),
+                collection, check
+            );
+        }
+    }
 }
 
 /// Handle logic for the `dump` command.
@@ -253,8 +272,26 @@ pub async fn dump_entrypoint(args: &mut DumpOptions) -> Result<(), DbErr> {
     let db = Database::connect(&args.url).await?;
 
     // Get all fields that have to be searched (e.g. if there is a wildcard)
-    let fields = database::fetch_valid_fields_or_panic(&db, args.table.to_owned().unwrap(), args.field.clone()).await?;
-    args.field = fields;
+    let db_fields = database::fetch_fields(&db, args.table.as_ref().unwrap()).await?;
+
+    args.field = match args.field.is_empty() {
+        true => db_fields,
+        false => {
+            let fields_with_wildcard = args
+                .field
+                .iter()
+                .flat_map(|field| wildcard::find_with(&field, &db_fields))
+                .collect::<Vec<String>>();
+
+            validate_fields_or_panic(
+                &fields_with_wildcard,
+                &db_fields,
+                args.table.as_ref().unwrap(),
+            );
+
+            fields_with_wildcard
+        }
+    };
 
     // Build the db query's where clause
     let mut condition = Condition::all();
