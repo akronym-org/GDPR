@@ -31,7 +31,7 @@ start: ## Start running databases
 
 .PHONY: dev
 dev: ## Run the CLI on -f thing.content
-	cargo run -- dump -f 'thing.content' -o yaml	
+	cargo run -- dump -t thing -o yaml	
 
 .PHONY: stop
 stop: ## Stop directus and dev server

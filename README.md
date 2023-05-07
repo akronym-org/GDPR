@@ -14,9 +14,9 @@ GDPR's goals are:
 
 ## Limitations
 
-* Currently only works with Postgres.
-* GDPR is pre-alpha. Only `dump` works (sort of).
-* You must specify a table and a field.
+* Currently only works with Postgres
+* GDPR is pre-alpha. Only `dump` works
+* You can & must currently specify one `--table`
 * This tool doesn't have a security audit. Don't use it!
 * GDPR uses SeaORM, which supports Postgres, MySQL and SQLite.
 

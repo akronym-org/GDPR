@@ -5,6 +5,7 @@ use cli::{Cli, Command};
 use futures::executor::block_on;
 
 pub mod cli;
+pub mod database;
 pub mod dedupe;
 pub mod dump;
 pub mod entities;
@@ -18,8 +19,8 @@ fn main() {
 
     match args.command {
         Command::Dump(args) => {
-            let options = DumpOptions::from(args);
-            if let Err(err) = block_on(dump_entrypoint(&options)) {
+            let mut options = DumpOptions::from(args);
+            if let Err(err) = block_on(dump_entrypoint(&mut options)) {
                 panic!("{}", err);
             }
         }
