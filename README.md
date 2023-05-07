@@ -2,15 +2,16 @@
 
 A CLI that helps you wrangle & audit hundreds of Directus permissions.
 
-Directus Permissions are administered and displayed per role. But what if you need to verify WHO
-has access to a specific column? What if you have 20 roles and need to change specific access
-to a new column?
+The problem: Directus Permissions are administered and displayed per role.
+
+* What if you want to verify WHO has access to a specific column?
+* What if you have 20 roles and want to add specific access to a new column?
 
 GDPR's goals are:
 
 * Quickly iterate in your dev env
 * Verify permissions during/after deployment in your pipeline
-* Audit Directus deployments easier
+* Audit your Directus deployment
 
 ## Limitations
 
@@ -20,13 +21,13 @@ GDPR's goals are:
 * This tool doesn't have a security audit. Don't use it!
 * GDPR uses SeaORM, which supports Postgres, MySQL and SQLite.
 
-## How to
+## Roadmap
 
 The available features are (going to be):
 
-* show/save permissions per table, per field, with wildcard
+* show/save permissions per table, per field, with wildcards
 * `replace` / `patch`: update permissions, granular/universal, with wildcards
-* create knex migrations you can put into your `extensions/migrations
+* easily seed roles and permissions
 
 ## Auditing permissions
 
