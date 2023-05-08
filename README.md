@@ -1,13 +1,19 @@
 # GDPR – Granular Directus Permissions Resolver
 
-A CLI that helps you wrangle & audit hundreds of Directus permissions.
+A CLI that helps you wrangle & audit hundreds of 🐇 [Directus](https://directus.io) permissions.
 
-The problem: Directus Permissions are administered and displayed per role.
 
-* What if you want to verify WHO has access to a specific column?
-* What if you have 20 roles and want to add specific access to a new column?
+📚 Read the Docs at: [gdpr.akronym.io](https://gdpr.akronym.io)
 
-GDPR's goals are:
+## The problem
+
+Directus Permissions are administered and displayed per role.
+
+What if you want to verify WHO has access to a specific column?
+
+What if you have 20 roles and want to add specific access to a new column?
+
+## Goals
 
 * Quickly iterate in your dev env
 * Verify permissions during/after deployment in your pipeline
