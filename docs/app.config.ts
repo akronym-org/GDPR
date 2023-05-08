@@ -1,7 +1,7 @@
 export default defineAppConfig({
   docus: {
     title: 'GDPR',
-    description: 'Wrangle your Directus permissions with ease',
+    description: 'Wrangle Directus permissions with ease',
     url: 'https://akronym.io',
     socials: {
       github: 'akronym-org/gdpr'
@@ -11,7 +11,8 @@ export default defineAppConfig({
       exclude: []
     },
     header: {
-      logo: false
+      logo: true,
+      showLinkIcon: true
     },
     footer: {
       textLinks: [
@@ -20,6 +21,13 @@ export default defineAppConfig({
           href: 'https://akronym.io'
         }
       ],
-    }
+    },
+    github: {
+      edit: true,
+      dir: 'docs/content',
+      branch: 'main',
+      owner: 'akronym-org',
+      repo: 'gdpr',
+    },
   }
 })
