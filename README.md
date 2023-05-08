@@ -1,7 +1,8 @@
 # GDPR – Granular Directus Permissions Resolver
 
-A CLI that helps you wrangle & audit hundreds of 🐇 [Directus](https://directus.io) permissions.
+**Warning: GDPR is pre-alpha**
 
+A CLI that helps you wrangle & audit hundreds of 🐇 [Directus](https://directus.io) permissions.
 
 📚 Read the Docs at: [gdpr.akronym.io](https://gdpr.akronym.io)
 
