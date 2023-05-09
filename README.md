@@ -1,4 +1,4 @@
-# GDPR – Granular Directus Permissions Resolver
+# 🦔 GDPR – Granular Directus Permissions Resolver
 
 **Warning: GDPR is pre-alpha**
 
