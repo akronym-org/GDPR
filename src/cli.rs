@@ -1,7 +1,7 @@
 use clap::Parser;
-use regex::Regex;
 use std::fmt;
 use std::str;
+use crate::utils;
 
 #[derive(Parser)]
 #[command(
@@ -28,7 +28,7 @@ pub struct Dump {
     pub global_args: GlobalArgs,
 
     #[clap(flatten)]
-    pub dump_args: DumpArgs,
+    pub dump_args: DumpUserArgs,
 }
 
 #[derive(Parser)]
@@ -96,15 +96,7 @@ pub struct GlobalArgs {
 }
 
 #[derive(Parser)]
-pub struct DumpArgs {
-    #[arg(short = 'f', long, value_parser = remove_whitespace)]
-    pub field: Option<String>,
-
-    #[arg(short = 't', long)]
-    pub table: Option<String>,
-}
-
-fn remove_whitespace(s: &str) -> Result<String, String> {
-    let trimmed = s.split(',').map(|word| word.trim().to_owned()).collect::<Vec<String>>().join(",");
-    Ok(trimmed.to_owned())
+pub struct DumpUserArgs {
+    #[arg(short = 'r', long, value_parser = utils::remove_whitespace)]
+    pub request: Option<Vec<String>>,
 }

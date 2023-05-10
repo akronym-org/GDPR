@@ -5,13 +5,14 @@ use cli::{Cli, Command};
 use futures::executor::block_on;
 
 pub mod cli;
+pub mod config;
 pub mod database;
-pub mod wildcard;
 pub mod dump;
 pub mod entities;
 pub mod manifest;
 pub mod test;
 pub mod utils;
+pub mod wildcard;
 
 fn main() {
     let args = Cli::parse();

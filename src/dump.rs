@@ -1,75 +1,67 @@
-use crate::cli::{Dump, DumpArgs, GlobalArgs, OutputFormat};
+use crate::cli::{Dump, DumpUserArgs, GlobalArgs, OutputFormat};
+use crate::config;
 use crate::database;
 use crate::entities::*;
 use crate::manifest;
-use crate::utils;
+use crate::utils::{self, split_one_point_strictly};
 use crate::wildcard;
 use indexmap::IndexMap;
 use sea_orm::*;
+use sea_orm::sea_query::Table;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+/// Handle logic for the `dump` command.
+///
+/// # Arguments
+///
+/// * `args` - A reference to user's `dump` specific options.
+pub async fn dump_entrypoint(args: &mut DumpOptions) -> Result<(), DbErr> {
+    let db = Database::connect(&args.url).await?;
+
+    println!("fields: {:#?}", args.request);
+
+    // Build the db query's where clause
+    let mut condition = Condition::any();
+    // condition = condition.add(build_collection_condition(&args.table));
+    condition = condition.add(build_field_condition(&args.request));
+
+    // Building the query as string (uncomment to see the query)
+    // ```
+    // let query = directus_permissions::Entity::find()
+    //     .filter(condition.clone()).build(DbBackend::Postgres).to_string();
+    // println!("query: {}", query);
+    // ```
+    // let permissions: Vec<directus_permissions::Model> = directus_permissions::Entity::find()
+    //     .filter(condition)
+    //     .all(&db)
+    //     .await?;
+
+    // let organized_dump = organize_fields(&args, &permissions);
+
+    // Toggled off: We'll replace role ids with role names later
+    // let roles: Vec<Option<directus_roles::Model>> =
+    //     permissions.load_one(directus_roles::Entity, &db).await?;
+    // println!("roles {:#?}", roles);
+
+    // output_dump(&args.output, &organized_dump);
+
+    return Ok(());
+}
 
 #[derive(Debug)]
 pub struct DumpOptions {
     url: String,
     output: OutputFormat,
-    table: Option<String>,
-    field: Vec<String>,
+    request: Vec<String>,
 }
 
-// TODO: generalize this for other commands in cli.rs
-// with default trait impls
 impl From<Dump> for DumpOptions {
     fn from(dump: Dump) -> Self {
-        let Dump {
-            global_args: GlobalArgs { url, output },
-            dump_args:
-                DumpArgs {
-                    mut table,
-                    mut field,
-                },
-        } = dump;
-
-        // unpack field argument if it's referencing a table e.g. `table.field`
-        if let Some(unpacked_field) = field.as_ref() {
-            let split_table_field = utils::split_one_point_strictly(unpacked_field);
-            match split_table_field {
-                (t, Some(f)) => {
-                    if table.is_some() {
-                        panic!(concat!(
-                            "You cannot use `--field` with dot notation (e.g.: table_name.field_name) ",
-                            "in combination with `--table`. Either use --field with a simple field name ",
-                            "e.g.: `--field field_name` or don't use --table."
-                        ));
-                    }
-                    table = Some(t.to_owned());
-                    field = Some(f.to_owned());
-                }
-                (f, None) => {
-                    field = Some(f.to_owned());
-                }
-            }
-        }
-
-        // Collect `field` into a vector and split if it's a string with commas.
-        // If there is only a single wildcard (*) somewhere, discard and add empty vector.
-        let fields = match field {
-            Some(f) => {
-                let split_fields: Vec<String> = f.split(',').map(|s| s.to_owned()).collect();
-                if split_fields.contains(&"*".to_string()) {
-                    vec![]
-                } else {
-                    split_fields
-                }
-            }
-            None => vec![],
-        };
-
         return DumpOptions {
-            url,
-            output,
-            table,
-            field: fields,
+            url: dump.global_args.url,
+            output: dump.global_args.output,
+            request: dump.dump_args.request.unwrap(),
         };
     }
 }
@@ -119,9 +111,9 @@ struct DataWithVersion {
 /// # Arguments
 ///
 /// * `input` - An input JsonValue
-pub fn deduplicate(input: Vec<Rule>) -> Vec<Rule> {
-    todo!()
-}
+// pub fn deduplicate(input: Vec<Rule>) -> Vec<Rule> {
+//     todo!()
+// }
 
 /// Organize the database permissions into GDPR's base format.
 ///
@@ -132,7 +124,7 @@ pub fn deduplicate(input: Vec<Rule>) -> Vec<Rule> {
 ///   containing the permissions to be organized.
 pub fn organize_fields(args: &DumpOptions, input: &Vec<directus_permissions::Model>) -> DumpAll {
     let mut dump_all = HashMap::new();
-    for field_name in &args.field {
+    for field_name in &args.request {
         let mut field = Field::new();
 
         // loop over each action
@@ -207,119 +199,116 @@ pub fn output_dump(output: &OutputFormat, data: &DumpAll) {
     println!("{:#}", show);
 }
 
-/// Build a series of WHERE conditions for all fields
+/// Build a series of WHERE conditions for all fields a user requested
 ///
 /// # Arguments
 ///
-/// * `field` - a reference to the vector of strings with all field names or wildcard
-fn build_field_condition(fields: &Vec<String>) -> Condition {
-    // println!("fields {:#?}", fields);
-    if fields.contains(&String::from("*")) {
-        // do something
+/// * `requests` - a reference to the vector of strings with all field names or wildcard
+fn build_field_condition(requests: &Vec<String>) -> Condition {
+    if requests.contains(&String::from("*")) {
         return Condition::any();
     }
 
     let mut condition = Condition::all();
 
-    for field in fields {
-        condition = condition.add(
-            Condition::any()
-                // if `field` matches exactly
-                .add(directus_permissions::Column::Fields.eq(field))
-                // if `field` is in the middle of a csv of multiple fields
-                .add(
-                    directus_permissions::Column::Fields
-                        .like(("%,".to_owned() + field + ",%").as_str()),
-                )
-                // if `field` is at the start
-                .add(directus_permissions::Column::Fields.like((field.to_owned() + ",%").as_str()))
-                // if `field` is at the end
-                .add(directus_permissions::Column::Fields.like(("%,".to_owned() + field).as_str()))
-                // if it's about all fields of a table directus uses a wildcard
-                .add(directus_permissions::Column::Fields.eq("*")),
-        );
+    for req in requests {
+        let field_requester: FieldRequester = Resource::from(req.clone()).into();
+        match field_requester {
+            FieldRequester::CollectionWithWildcard(field_requester) => println!("collection with wildcard {:#?}", field_requester),
+            FieldRequester::CollectionSpecific(field_requester) => println!("collection specific {:#?}", field_requester),
+            FieldRequester::BothWithWildcard(field_requester) => println!("both with wildcard {:#?}", field_requester),
+            FieldRequester::CollectionWithWildcardButFieldSpecific(field_requester) => println!("wild collection specific field {:#?}", field_requester),
+            FieldRequester::FieldWithWildcard(field_requester) => println!("specific collection wild field {:#?}", field_requester),
+            FieldRequester::FieldSpecific(field_requester) => println!("specific col wild field {:#?}", field_requester),
+        }
     }
     return condition;
 }
 
+#[derive(Debug)]
+struct Resource {
+    collection: MaybeWildcard,
+    field: Option<MaybeWildcard>,
+}
+
+impl From<String> for Resource {
+    fn from(string: String) -> Self {
+        let split = split_one_point_strictly(&string);
+        return Self {
+            collection: MaybeWildcard::from(split.0.to_string()),
+            field: split.1.map(|s| MaybeWildcard::from(s.to_string())),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum MaybeWildcard {
+    Specific(String),
+    Wildcard(String),
+}
+
+impl From<String> for MaybeWildcard {
+    fn from(s: String) -> Self {
+        if s.contains('*') {
+            MaybeWildcard::Wildcard(s)
+        } else {
+            MaybeWildcard::Specific(s)
+        }
+    }
+}
+
+enum FieldRequester {
+    CollectionWithWildcard(Resource),
+    CollectionSpecific(Resource),
+    BothWithWildcard(Resource),
+    CollectionWithWildcardButFieldSpecific(Resource),
+    FieldWithWildcard(Resource),
+    FieldSpecific(Resource),
+}
+
+impl From<Resource> for FieldRequester {
+    fn from(resource: Resource) -> Self {
+        match &resource {
+            Resource {
+                collection: MaybeWildcard::Wildcard(_),
+                field: None,
+            } => FieldRequester::CollectionWithWildcard(resource),
+            Resource {
+                collection: MaybeWildcard::Specific(_),
+                field: None,
+            } => FieldRequester::CollectionSpecific(resource),
+            Resource {
+                collection: MaybeWildcard::Wildcard(_),
+                field: Some(MaybeWildcard::Wildcard(_)),
+            } => FieldRequester::BothWithWildcard(resource),
+            Resource {
+                collection: MaybeWildcard::Wildcard(_),
+                field: Some(MaybeWildcard::Specific(_)),
+            } => FieldRequester::CollectionWithWildcardButFieldSpecific(resource),
+            Resource {
+                collection: MaybeWildcard::Specific(_),
+                field: Some(MaybeWildcard::Wildcard(_)),
+            } => FieldRequester::FieldWithWildcard(resource),
+            Resource {
+                collection: MaybeWildcard::Specific(_),
+                field: Some(MaybeWildcard::Specific(_)),
+            } => FieldRequester::FieldSpecific(resource),
+        }
+    }
+}
+
 /// Validate fields or panic
-pub fn validate_fields_or_panic(
-    to_be_checked: &Vec<String>,
-    required: &Vec<String>,
-    collection: &str,
-) {
+pub fn validate_from_vec_or_panic(to_be_checked: &Vec<String>, required: &Vec<String>) {
     for check in to_be_checked {
         if !required.contains(&check) {
             panic!(
                 concat!(
                     "You requested permissions for a field, that is unknown to Directus ",
                     "because it can't be found in directus_fields.\n",
-                    "Collection: {}\n",
                     "Field: {} <-- does not exist!"
                 ),
-                collection, check
+                check
             );
         }
     }
-}
-
-/// Handle logic for the `dump` command.
-///
-/// # Arguments
-///
-/// * `args` - A reference to the `dump` specific arguments and user options.
-pub async fn dump_entrypoint(args: &mut DumpOptions) -> Result<(), DbErr> {
-    let db = Database::connect(&args.url).await?;
-
-    // Get all fields that have to be searched (e.g. if there is a wildcard)
-    let db_fields = database::fetch_fields(&db, args.table.as_ref().unwrap()).await?;
-
-    args.field = match args.field.is_empty() {
-        true => db_fields,
-        false => {
-            let fields_with_wildcard = args
-                .field
-                .iter()
-                .flat_map(|field| wildcard::find_with(&field, &db_fields))
-                .collect::<Vec<String>>();
-
-            validate_fields_or_panic(
-                &fields_with_wildcard,
-                &db_fields,
-                args.table.as_ref().unwrap(),
-            );
-
-            fields_with_wildcard
-        }
-    };
-
-    // Build the db query's where clause
-    let mut condition = Condition::all();
-    if let Some(ref table) = args.table {
-        condition = condition.add(directus_permissions::Column::Collection.eq(table));
-    }
-
-    condition = condition.add(build_field_condition(&args.field));
-
-    // Building the query as string (uncomment to see the query)
-    // ```
-    // let query = directus_permissions::Entity::find()
-    //     .filter(condition.clone()).build(DbBackend::Postgres).to_string();
-    // println!("query: {}", query);
-    // ```
-    let permissions: Vec<directus_permissions::Model> = directus_permissions::Entity::find()
-        .filter(condition)
-        .all(&db)
-        .await?;
-
-    let organized_dump = organize_fields(&args, &permissions);
-
-    // Toggled off: We'll replace role ids with role names later
-    // let roles: Vec<Option<directus_roles::Model>> =
-    //     permissions.load_one(directus_roles::Entity, &db).await?;
-    // println!("roles {:#?}", roles);
-
-    output_dump(&args.output, &organized_dump);
-
-    return Ok(());
 }

@@ -1,3 +1,4 @@
+#![allow(unused)]  // FIXME:
 //! Tools and functions to help deduplicate data
 //! To display many data points in yamls to users more nicely.
 //!
@@ -41,6 +42,7 @@ use regex::Regex;
 /// let pattern = build_glob_patterns(vec!["prefer_prefix_glob:xx", "random_glob_3x", "prefer_prefix_?_glob_3x", "prefer_prefix_glob_3x"])
 /// assert_eq!(pattern, vec!["random_glob_3x", "prefer_prefix_*"])
 /// ```
+
 pub fn build_glob_like_patterns(strings: Vec<&str>) -> Vec<String> {
     todo!();
 }

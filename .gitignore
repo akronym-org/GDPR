@@ -11,3 +11,4 @@ target/
 
 # General
 .DS_Store
+.vscode/
