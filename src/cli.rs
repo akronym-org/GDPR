@@ -98,5 +98,5 @@ pub struct GlobalArgs {
 #[derive(Parser)]
 pub struct DumpUserArgs {
     #[arg(short = 'r', long, value_parser = utils::remove_whitespace)]
-    pub request: Option<Vec<String>>,
+    pub resource: Option<Vec<String>>,
 }

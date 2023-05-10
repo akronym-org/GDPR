@@ -42,17 +42,17 @@ pub async fn fetch_collections(
     return Ok(collections);
 }
 
-/// Build condition for fields.
+/// Build condition for a specific field
 ///
 /// It's tricky 'cause the `fields` column are CSVs or could be a wildcard.
 ///
 /// # Arguments
 /// * `field` - a string reference of a field.
-pub fn field_finder(field: &str) -> Condition {
+pub fn field_specific(field: &str) -> Condition {
     return Condition::any()
             // if `field` matches exactly
             .add(directus_permissions::Column::Fields.eq(field))
-            // if `field` is in the middle of a csv of multiple fields
+            // if `field` is in the middle of a csv
             .add(
                 directus_permissions::Column::Fields
                     .like(("%,".to_owned() + field + ",%").as_str()),
@@ -63,4 +63,51 @@ pub fn field_finder(field: &str) -> Condition {
             .add(directus_permissions::Column::Fields.like(("%,".to_owned() + field).as_str()))
             // if it's about all fields of a table directus uses a wildcard
             .add(directus_permissions::Column::Fields.eq("*"));
+}
+
+/// FIXME: This is more difficult.
+/// Consider this example `value1,wildcard,unwild,value4`
+/// If we search for wild*, we don't want to match unwild
+/// Try if a subquery is good enough?
+///     1. Use LIKE `%,wild%`
+///        Use LIKE `%
+///     2. then check if result contains only one comma before/after wild
+///
+/// Build condition for a wildcard field
+///
+/// It's tricky 'cause the `fields` column are CSVs or could be a wildcard.
+///
+/// # Arguments
+/// * `field` - a string reference of a field with a wildcard character
+pub fn field_wildcard(field: &str) -> Condition {
+    let binding = field.replace("*", "%");
+    return Condition::any()
+            // if there's only one value in `field` column
+            .add(Condition::all()
+                .add(directus_permissions::Column::Fields.not_like(","))
+                .add(directus_permissions::Column::Fields.like(&binding))
+            )
+            // if `field` is in the middle of a csv
+            .add(
+                directus_permissions::Column::Fields
+                    .like(("%,".to_owned() + &binding + ",%").as_str()),
+            )
+            // if `field` is at the start of csv
+            // FIXME: this is not good, it only works if wildcard is at the end of binding
+            .add(directus_permissions::Column::Fields.starts_with(&binding))
+            // if `field` is at the end of csv
+            // FIXME: this is not good, it only works if wildcard is at the start of binding
+            .add(directus_permissions::Column::Fields.ends_with(&binding))
+            // if it's about all fields of a table directus uses a wildcard
+            .add(directus_permissions::Column::Fields.eq("*"));
+}
+
+
+
+pub fn collection_wildcard(collection: &str) -> Condition {
+    Condition::all().add(directus_permissions::Column::Collection.like(collection.replace("*", "%").as_ref()))
+}
+
+pub fn collection_specific(collection: &str) -> Condition {
+    Condition::all().add(directus_permissions::Column::Collection.eq(collection))
 }
