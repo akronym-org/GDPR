@@ -10,6 +10,7 @@ pub mod database;
 pub mod dump;
 pub mod entities;
 pub mod manifest;
+pub mod reversed_permissions;
 pub mod test;
 pub mod utils;
 pub mod wildcard;

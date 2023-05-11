@@ -1,42 +1,46 @@
-use crate::cli::{Dump, DumpUserArgs, GlobalArgs, OutputFormat};
-use crate::config;
+use crate::cli::{Dump, OutputFormat};
 use crate::database;
-use crate::entities::*;
+use crate::entities::directus_permissions;
 use crate::manifest;
-use crate::utils::{self, split_one_point_strictly};
-use crate::wildcard;
-use indexmap::IndexMap;
-use sea_orm::sea_query::Table;
-use sea_orm::*;
+use crate::reversed_permissions;
+use crate::utils;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::default::Default;
+use sea_orm::{Database,DbErr,Select,Condition};
+use sea_orm::{entity::*, query::*};
 
-/// Handle logic for the `dump` command.
+
+/// 🏡 Handle logic for the `dump` command.
 ///
 /// # Arguments
 ///
 /// * `args` - A reference to user's `dump` specific options.
 pub async fn dump_entrypoint(args: &mut DumpOptions) -> Result<(), DbErr> {
-    println!("fields: {:#?}", args.resources);
-
-    let conditions = args.to_conditions();
-
     let db = Database::connect(&args.url).await?;
+
+    // FIXME: importing collections and fields should relate to args.resources
+    // and only request necessary rows.
+    let collections = database::fetch_collections(&db).await?;
+    let fields = database::fetch_fields(&db, &collections).await?;
+    let query = args.resources.to_query();
+
+    println!("hahah {:#?}", args.resources);
 
     // Building the query as string (uncomment to see the query)
     // ```
-    // let query = directus_permissions::Entity::find()
-    //     .filter(conditions.clone()).build(DbBackend::Postgres).to_string();
-    // println!("query: {}", query);
+    // let builder = db.get_database_backend();
+    // let sql_query = query.build(builder).to_string();
+    // println!("query: {}", sql_query);
     // ```
-    let permissions: Vec<directus_permissions::Model> = directus_permissions::Entity::find()
-        .filter(conditions)
-        .all(&db)
-        .await?;
+    let permissions: Vec<directus_permissions::Model> = query.all(&db).await?;
+    println!("permissions: {:#?}", permissions);
 
-    println!("hahaha {:#?}", permissions);
-    // let organized_dump = organize_fields(&args, &permissions);
+    // FIXME: build this
+    // let organized_dump = reversed_permissions::Builder::request(&args.resources)
+    //     .permission(&permissions)
+    //     .options()
+    //     .dedupe_roles()
+    //     .dedupe_permissions()
+    //     .build();
 
     // Toggled off: We'll replace role ids with role names later
     // let roles: Vec<Option<directus_roles::Model>> =
@@ -45,27 +49,14 @@ pub async fn dump_entrypoint(args: &mut DumpOptions) -> Result<(), DbErr> {
 
     // output_dump(&args.output, &organized_dump);
 
-    return Ok(());
+    Ok(())
 }
 
 #[derive(Debug)]
 pub struct DumpOptions {
     url: String,
     output: OutputFormat,
-    resources: Vec<FieldRequester>,
-}
-
-impl DumpOptions {
-    pub fn to_conditions(&self) -> Condition {
-       if self.resources.is_empty() {
-            Condition::all()
-        } else {
-            self.resources
-                .iter()
-                .map(|res| res.to_condition())
-                .fold(Condition::any(), |acc, condition| acc.add(condition))
-        }
-    }
+    resources: Vec<Request>,
 }
 
 impl From<Dump> for DumpOptions {
@@ -78,34 +69,51 @@ impl From<Dump> for DumpOptions {
                 .resource
                 .unwrap_or_default()
                 .iter()
-                .map(|req| Resource::from(req.clone()).into())
+                .map(|req| RequestEntity::from(req.clone()).into())
                 .collect(),
         };
     }
 }
 
 #[derive(Debug)]
-struct Resource {
-    collection: Option<MaybeWildcard>,
-    field: Option<MaybeWildcard>,
+pub struct RequestEntity {
+    collection: MaybeWildcard,
+    field: MaybeWildcard,
 }
 
-impl Default for Resource {
-    fn default() -> Self {
+impl From<String> for RequestEntity {
+    fn from(string: String) -> Self {
+        let split = utils::split_one_point_strictly(&string);
         Self {
-            collection: Some(MaybeWildcard::HasWildcard("*".to_string())),
-            field: None,
+            collection: MaybeWildcard::from(split.0.unwrap_or("*").to_string()),
+            field: MaybeWildcard::from(split.1.unwrap_or("*").to_string()),
         }
     }
 }
 
-impl From<String> for Resource {
-    fn from(string: String) -> Self {
-        let split = split_one_point_strictly(&string);
-        return Self {
-            collection: Some(MaybeWildcard::from(split.0.to_string())),
-            field: split.1.map(|s| MaybeWildcard::from(s.to_string())),
-        };
+trait ToQuery {
+    fn to_query(&self) -> Select<directus_permissions::Entity>;
+}
+
+impl ToQuery for Vec<Request> {
+    fn to_query(&self) -> Select<directus_permissions::Entity> {
+        directus_permissions::Entity::find().filter(self.to_conditions())
+    }
+}
+
+trait ToConditions {
+    fn to_conditions(&self) -> Condition;
+}
+
+impl ToConditions for Vec<Request> {
+    fn to_conditions(&self) -> Condition {
+        if self.is_empty() {
+            Condition::all()
+        } else {
+            self.iter()
+                .map(|res| res.to_condition())
+                .fold(Condition::any(), |acc, condition| acc.add(condition))
+        }
     }
 }
 
@@ -113,6 +121,7 @@ impl From<String> for Resource {
 enum MaybeWildcard {
     Specific(String),
     HasWildcard(String),
+    All,
 }
 
 impl MaybeWildcard {
@@ -120,13 +129,16 @@ impl MaybeWildcard {
         match self {
             MaybeWildcard::HasWildcard(s) => s.as_str(),
             MaybeWildcard::Specific(s) => s.as_str(),
+            MaybeWildcard::All => "*",
         }
     }
 }
 
 impl From<String> for MaybeWildcard {
     fn from(s: String) -> Self {
-        if s.contains('*') {
+        if s == "*" {
+            MaybeWildcard::All
+        } else if s.contains('*') {
             MaybeWildcard::HasWildcard(s)
         } else {
             MaybeWildcard::Specific(s)
@@ -135,204 +147,102 @@ impl From<String> for MaybeWildcard {
 }
 
 #[derive(Debug)]
-enum FieldRequester {
-    BothNone(Resource),
-    WildCollectionNoField(Resource),
-    BothWild(Resource),
-    WildCollectionSpecificField(Resource),
-    SpecificCollectionNoField(Resource),
-    SpecificCollectionWildField(Resource),
-    BothSpecific(Resource),
-    NoCollectionWildField(Resource),
-    NoCollectionSpecificField(Resource),
+pub enum Request {
+    BothAll(RequestEntity),
+    WildCollectionAllFields(RequestEntity),
+    BothWild(RequestEntity),
+    WildCollectionSpecificField(RequestEntity),
+    SpecificCollectionAllFields(RequestEntity),
+    SpecificCollectionWildField(RequestEntity),
+    BothSpecific(RequestEntity),
+    AllCollectionsWildField(RequestEntity),
+    AllCollectionsSpecificField(RequestEntity),
 }
 
-impl From<Resource> for FieldRequester {
-    fn from(resource: Resource) -> Self {
-        match &resource {
-            Resource {
-                collection: None,
-                field: None,
-            } => FieldRequester::BothNone(resource),
-            Resource {
-                collection: Some(MaybeWildcard::HasWildcard(_)),
-                field: None,
-            } => FieldRequester::WildCollectionNoField(resource),
-            Resource {
-                collection: Some(MaybeWildcard::HasWildcard(_)),
-                field: Some(MaybeWildcard::HasWildcard(_)),
-            } => FieldRequester::BothWild(resource),
-            Resource {
-                collection: Some(MaybeWildcard::HasWildcard(_)),
-                field: Some(MaybeWildcard::Specific(_)),
-            } => FieldRequester::WildCollectionSpecificField(resource),
-            Resource {
-                collection: Some(MaybeWildcard::Specific(_)),
-                field: None,
-            } => FieldRequester::SpecificCollectionNoField(resource),
-            Resource {
-                collection: Some(MaybeWildcard::Specific(_)),
-                field: Some(MaybeWildcard::HasWildcard(_)),
-            } => FieldRequester::SpecificCollectionWildField(resource),
-            Resource {
-                collection: Some(MaybeWildcard::Specific(_)),
-                field: Some(MaybeWildcard::Specific(_)),
-            } => FieldRequester::BothSpecific(resource),
-            Resource {
-                collection: None,
-                field: Some(MaybeWildcard::HasWildcard(_)),
-            } => FieldRequester::NoCollectionWildField(resource),
-            Resource {
-                collection: None,
-                field: Some(MaybeWildcard::Specific(_)),
-            } => FieldRequester::NoCollectionSpecificField(resource),
+impl From<RequestEntity> for Request {
+    fn from(request_item: RequestEntity) -> Self {
+        match &request_item {
+            RequestEntity {
+                collection: MaybeWildcard::All,
+                field: MaybeWildcard::All,
+            } => Request::BothAll(request_item),
+            RequestEntity {
+                collection: MaybeWildcard::HasWildcard(_),
+                field: MaybeWildcard::All,
+            } => Request::WildCollectionAllFields(request_item),
+            RequestEntity {
+                collection: MaybeWildcard::HasWildcard(_),
+                field: MaybeWildcard::HasWildcard(_),
+            } => Request::BothWild(request_item),
+            RequestEntity {
+                collection: MaybeWildcard::HasWildcard(_),
+                field: MaybeWildcard::Specific(_),
+            } => Request::WildCollectionSpecificField(request_item),
+            RequestEntity {
+                collection: MaybeWildcard::Specific(_),
+                field: MaybeWildcard::All,
+            } => Request::SpecificCollectionAllFields(request_item),
+            RequestEntity {
+                collection: MaybeWildcard::Specific(_),
+                field: MaybeWildcard::HasWildcard(_),
+            } => Request::SpecificCollectionWildField(request_item),
+            RequestEntity {
+                collection: MaybeWildcard::Specific(_),
+                field: MaybeWildcard::Specific(_),
+            } => Request::BothSpecific(request_item),
+            RequestEntity {
+                collection: MaybeWildcard::All,
+                field: MaybeWildcard::HasWildcard(_),
+            } => Request::AllCollectionsWildField(request_item),
+            RequestEntity {
+                collection: MaybeWildcard::All,
+                field: MaybeWildcard::Specific(_),
+            } => Request::AllCollectionsSpecificField(request_item),
         }
     }
 }
 
-impl FieldRequester {
+impl Request {
     pub fn to_condition(&self) -> Condition {
         match &self {
-            FieldRequester::BothNone(_) => Condition::all(),
-            FieldRequester::WildCollectionNoField(r) => {
-                database::collection_wildcard(r.collection.as_ref().unwrap().as_str())
+            Request::BothAll(_) => Condition::all(),
+            Request::WildCollectionAllFields(r) => {
+                database::collection_wildcard(r.collection.as_str())
             }
-            FieldRequester::BothWild(r) => {
-                database::collection_wildcard(r.collection.as_ref().unwrap().as_str())
-                    .add(database::field_wildcard(r.field.as_ref().unwrap().as_str()))
+            Request::BothWild(r) => database::collection_wildcard(r.collection.as_str())
+                .add(database::field_wildcard(r.field.as_str())),
+            Request::WildCollectionSpecificField(_) => {
+                todo!() // FIXME: not correct. Likely `to_condition()` should become a
+                        // `to_query()` and create a subquery that first selects all
+                        // `directus_fields` that match field.
             }
-            FieldRequester::WildCollectionSpecificField(r) => {
-                database::collection_wildcard(r.collection.as_ref().unwrap().as_str())
-                    .add(database::field_specific(r.field.as_ref().unwrap().as_str()))
+            Request::SpecificCollectionAllFields(r) => {
+                database::collection_specific(r.collection.as_str())
             }
-            FieldRequester::SpecificCollectionNoField(r) => {
-                database::collection_specific(r.collection.as_ref().unwrap().as_str())
+            Request::SpecificCollectionWildField(r) => {
+                database::collection_specific(r.collection.as_str())
+                    .add(database::field_wildcard(r.field.as_str()))
             }
-            FieldRequester::SpecificCollectionWildField(r) => {
-                database::collection_specific(r.collection.as_ref().unwrap().as_str())
-                    .add(database::field_wildcard(r.field.as_ref().unwrap().as_str()))
+            Request::BothSpecific(r) => database::collection_specific(r.collection.as_str())
+                .add(database::field_specific(r.field.as_str())),
+            Request::AllCollectionsWildField(_) => {
+                todo!() // FIXME: not correct
             }
-            FieldRequester::BothSpecific(r) => {
-                database::collection_specific(r.collection.as_ref().unwrap().as_str())
-                    .add(database::field_specific(r.field.as_ref().unwrap().as_str()))
-            }
-            FieldRequester::NoCollectionWildField(r) => {
-                database::field_wildcard(r.field.as_ref().unwrap().as_str())
-            }
-            FieldRequester::NoCollectionSpecificField(r) => {
-                database::field_specific(r.field.as_ref().unwrap().as_str())
+            Request::AllCollectionsSpecificField(r) => {
+                // todo!() // FIXME: not correct
+                database::collection_wildcard(r.collection.as_str())
+                    .add(database::field_wildcard(r.field.as_str()))
             }
         }
     }
 }
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Rule {
-    roles: Vec<String>,
-    permissions: JsonValue,
-    validation: JsonValue,
-}
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Field {
-    create: Vec<Rule>,
-    read: Vec<Rule>,
-    update: Vec<Rule>,
-    delete: Vec<Rule>,
-    share: Vec<Rule>,
-}
-
-impl Field {
-    fn new() -> Self {
-        Self {
-            create: Vec::new(),
-            read: Vec::new(),
-            update: Vec::new(),
-            delete: Vec::new(),
-            share: Vec::new(),
-        }
-    }
-
-    pub fn iter_keys() -> impl Iterator<Item = &'static str> {
-        return ["create", "read", "update", "delete", "share"].into_iter();
-    }
-}
-
-type DumpAll = HashMap<String, Field>;
 
 #[derive(Serialize, Deserialize)]
 struct DataWithVersion {
     version: String,
     #[serde(flatten)]
-    data: DumpAll,
+    data: reversed_permissions::CollectionRules,
 }
-
-/// Deduplicate permissions and validations
-///
-/// # Arguments
-///
-/// * `input` - An input JsonValue
-// pub fn deduplicate(input: Vec<Rule>) -> Vec<Rule> {
-//     todo!()
-// }
-
-/// Organize the database permissions into GDPR's base format.
-///
-/// # Arguments
-///
-/// * `args` - A reference to the user's settings used by the dump command.
-/// * `permissions` - A reference to a vector of `directus_permissions::Model` objects
-///   containing the permissions to be organized.
-// pub fn organize_fields(args: &DumpOptions, input: &Vec<directus_permissions::Model>) -> DumpAll {
-//     let mut dump_all = HashMap::new();
-//     for field_name in &args.resources {
-//         let mut field = Field::new();
-
-//         // loop over each action
-//         for key in Field::iter_keys() {
-//             let role_permission = input
-//                 .iter()
-//                 .filter(|permission| permission.action == key)
-//                 .map(|permission| {
-//                     let mut map = IndexMap::new();
-//                     map.insert(
-//                         "roles".to_owned(),
-//                         JsonValue::String(permission.role.clone().unwrap_or("public".to_owned())),
-//                     );
-//                     map.insert(
-//                         "permissions".to_owned(),
-//                         permission.permissions.clone().unwrap_or(JsonValue::Null),
-//                     );
-//                     map.insert(
-//                         "validation".to_owned(),
-//                         permission.validation.clone().unwrap_or(JsonValue::Null),
-//                     );
-//                     map
-//                 })
-//                 .collect::<Vec<_>>();
-
-//             for permission in role_permission {
-//                 let dump_operation = Rule {
-//                     roles: vec![permission["roles"].as_str().unwrap().to_owned()],
-//                     permissions: permission["permissions"].clone(),
-//                     validation: permission["validation"].clone(),
-//                 };
-
-//                 match key {
-//                     "create" => field.create.push(dump_operation),
-//                     "read" => field.read.push(dump_operation),
-//                     "update" => field.update.push(dump_operation),
-//                     "delete" => field.delete.push(dump_operation),
-//                     "share" => field.share.push(dump_operation),
-//                     _ => (),
-//                 }
-//             }
-//         }
-
-//         dump_all.insert(field_name.to_owned(), field);
-//     }
-
-//     return dump_all;
-// }
 
 /// Displays the organized permissions dump in a human-readable format.
 ///
@@ -340,7 +250,7 @@ struct DataWithVersion {
 ///
 /// * `output` - A reference to the user's preferred output format.
 /// * `permissions` - a reference to the raw permissions.
-pub fn output_dump(output: &OutputFormat, data: &DumpAll) {
+pub fn output_dump(output: &OutputFormat, data: &reversed_permissions::CollectionRules) {
     let data_with_version = DataWithVersion {
         version: manifest::get_version(),
         // TODO: #low-priority
@@ -360,7 +270,7 @@ pub fn output_dump(output: &OutputFormat, data: &DumpAll) {
 }
 
 /// Validate fields or panic
-pub fn validate_from_vec_or_panic(
+fn validate_from_vec_or_panic(
     to_be_checked: &[String],
     required: &[String],
     required_name: Option<&str>,

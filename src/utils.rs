@@ -14,21 +14,23 @@
 /// let split = split_one_point_strictly(a_string);
 /// assert_eq!(split, ("some_funny", Some("business")));
 /// ```
-pub fn split_one_point_strictly(string: &str) -> (&str, Option<&str>) {
+pub fn split_one_point_strictly(string: &str) -> (Option<&str>, Option<&str>) {
     let count = string.matches('.').count();
     if count == 0 {
-        return (string, None);
+        (Some(string), None)
     } else if count == 1 {
         let split = string.split_once('.').unwrap();
-        return (split.0, Some(split.1));
+        return (
+            if !split.0.is_empty() { Some(split.0) } else { None },
+            if !split.1.is_empty() { Some(split.1) } else { None }
+        );
     } else {
         panic!("{} has too many points.", string)
     }
 }
 
 pub fn remove_whitespace(s: &str) -> Result<String, String> {
-    let trimmed = s.split(',').map(|word| word.trim().to_owned()).collect::<Vec<String>>().join(",");
-    Ok(trimmed.to_owned())
+    Ok(s.split(',').map(|word| word.trim().to_owned()).collect::<Vec<String>>().join(","))
 }
 
 #[cfg(test)]
@@ -39,14 +41,14 @@ mod tests {
     fn split_one_point_strictly_splits_one_point() {
         let s = "h.0";
         let result = split_one_point_strictly(s);
-        assert_eq!(result, ("h", Some("0")));
+        assert_eq!(result, (Some("h"), Some("0")));
     }
 
     #[test]
     fn split_one_point_strictly_splits_even_with_no_point() {
         let s = "h";
         let result = split_one_point_strictly(s);
-        assert_eq!(result, ("h", None));
+        assert_eq!(result, (Some("h"), None));
     }
 
     #[test]

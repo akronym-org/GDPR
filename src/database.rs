@@ -83,6 +83,8 @@ pub fn field_wildcard(field: &str) -> Condition {
     let binding = field.replace("*", "%");
     return Condition::any()
             // if there's only one value in `field` column
+            // this is so convoluted, because we can't check with .eq(&binding)
+            // because we're using wildcards.
             .add(Condition::all()
                 .add(directus_permissions::Column::Fields.not_like(","))
                 .add(directus_permissions::Column::Fields.like(&binding))
