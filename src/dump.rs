@@ -1,12 +1,14 @@
 use crate::cli::{Dump, OutputFormat};
-use crate::database;
+use crate::directus;
 use crate::entities::directus_permissions;
 use crate::manifest;
 use crate::reversed_permissions;
 use crate::utils;
+use crate::graph::{GraphToString,build_graph};
 use serde::{Deserialize, Serialize};
 use sea_orm::{Database,DbErr,Select,Condition};
 use sea_orm::{entity::*, query::*};
+use petgraph_graphml::GraphMl;
 
 
 /// 🏡 Handle logic for the `dump` command.
@@ -19,22 +21,28 @@ pub async fn dump_entrypoint(args: &mut DumpOptions) -> Result<(), DbErr> {
 
     // FIXME: importing collections and fields should relate to args.resources
     // and only request necessary rows.
-    let collections = database::fetch_collections(&db).await?;
-    let fields = database::fetch_fields(&db, &collections).await?;
+    let collections = directus::fetch_collections(&db).await?;
+    let fields = directus::fetch_fields(&db, &collections).await?;
     let query = args.resources.to_query();
 
-    println!("hahah {:#?}", args.resources);
-
-    // Building the query as string (uncomment to see the query)
-    // ```
+    // Output query as string? Uncomment!
+    // ```rust
     // let builder = db.get_database_backend();
     // let sql_query = query.build(builder).to_string();
     // println!("query: {}", sql_query);
     // ```
     let permissions: Vec<directus_permissions::Model> = query.all(&db).await?;
-    println!("permissions: {:#?}", permissions);
+    let graph = build_graph(permissions, &fields);
 
-    // FIXME: build this
+    match args.output {
+        OutputFormat::Dot => graph.draw(),
+        OutputFormat::GraphML => println!("{}", GraphMl::new(&graph)
+            .pretty_print(true)
+            .export_node_weights_display()),
+        _ => ()
+    }
+
+    // FIXME: -- skip. implemented as graph
     // let organized_dump = reversed_permissions::Builder::request(&args.resources)
     //     .permission(&permissions)
     //     .options()
@@ -42,6 +50,7 @@ pub async fn dump_entrypoint(args: &mut DumpOptions) -> Result<(), DbErr> {
     //     .dedupe_permissions()
     //     .build();
 
+    // TODO:
     // Toggled off: We'll replace role ids with role names later
     // let roles: Vec<Option<directus_roles::Model>> =
     //     permissions.load_one(directus_roles::Entity, &db).await?;
@@ -54,9 +63,9 @@ pub async fn dump_entrypoint(args: &mut DumpOptions) -> Result<(), DbErr> {
 
 #[derive(Debug)]
 pub struct DumpOptions {
-    url: String,
-    output: OutputFormat,
-    resources: Vec<Request>,
+    pub url: String,
+    pub output: OutputFormat,
+    pub resources: Vec<Request>,
 }
 
 impl From<Dump> for DumpOptions {
@@ -207,31 +216,33 @@ impl Request {
         match &self {
             Request::BothAll(_) => Condition::all(),
             Request::WildCollectionAllFields(r) => {
-                database::collection_wildcard(r.collection.as_str())
+                directus::collection_wildcard(r.collection.as_str())
             }
-            Request::BothWild(r) => database::collection_wildcard(r.collection.as_str())
-                .add(database::field_wildcard(r.field.as_str())),
+            Request::BothWild(r) => directus::collection_wildcard(r.collection.as_str())
+                .add(directus::field_wildcard(r.field.as_str())),
             Request::WildCollectionSpecificField(_) => {
-                todo!() // FIXME: not correct. Likely `to_condition()` should become a
-                        // `to_query()` and create a subquery that first selects all
+                todo!() // FIXME:
+                        // use a subquery that first selects all
                         // `directus_fields` that match field.
             }
             Request::SpecificCollectionAllFields(r) => {
-                database::collection_specific(r.collection.as_str())
+                directus::collection_specific(r.collection.as_str())
             }
             Request::SpecificCollectionWildField(r) => {
-                database::collection_specific(r.collection.as_str())
-                    .add(database::field_wildcard(r.field.as_str()))
+                directus::collection_specific(r.collection.as_str())
+                    .add(directus::field_wildcard(r.field.as_str()))
             }
-            Request::BothSpecific(r) => database::collection_specific(r.collection.as_str())
-                .add(database::field_specific(r.field.as_str())),
+            Request::BothSpecific(r) => directus::collection_specific(r.collection.as_str())
+                .add(directus::field_specific(r.field.as_str())),
             Request::AllCollectionsWildField(_) => {
-                todo!() // FIXME: not correct
+                todo!() // FIXME:
+                        // use a subquery that first selects all
+                        // `directus_fields` that match field.
             }
-            Request::AllCollectionsSpecificField(r) => {
-                // todo!() // FIXME: not correct
-                database::collection_wildcard(r.collection.as_str())
-                    .add(database::field_wildcard(r.field.as_str()))
+            Request::AllCollectionsSpecificField(_) => {
+                todo!() // FIXME:
+                        // use a subquery that first selects all
+                        // `directus_fields` that match field.
             }
         }
     }
@@ -264,29 +275,8 @@ pub fn output_dump(output: &OutputFormat, data: &reversed_permissions::Collectio
         OutputFormat::Pretty => {
             panic!("Pretty is not yet implemented. Choose either json or yaml.")
         }
+        _ => "ignore for now".to_owned(),
     };
 
     println!("{:#}", show);
-}
-
-/// Validate fields or panic
-fn validate_from_vec_or_panic(
-    to_be_checked: &[String],
-    required: &[String],
-    required_name: Option<&str>,
-) {
-    for check in to_be_checked {
-        if !required.contains(&check) {
-            panic!(
-                concat!(
-                    "You requested permissions for a field, that is unknown to Directus ",
-                    "because it can't be found in directus_fields.\n",
-                    "Collection: {}\n",
-                    "Field: {} <-- does not exist!"
-                ),
-                required_name.unwrap_or("[unknown]"),
-                check
-            );
-        }
-    }
 }

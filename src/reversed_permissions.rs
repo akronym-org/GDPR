@@ -1,3 +1,7 @@
+// FIXME: Reconsider this module
+// This should probably go and be integrated in `dump.rs`
+// and a potential `output` module
+
 //! Build a collection of Permission Rules
 use crate::dump;
 use crate::entities::directus_permissions;

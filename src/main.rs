@@ -1,4 +1,5 @@
 use crate::dump::{dump_entrypoint, DumpOptions};
+use anyhow;
 use clap::Parser;
 use cli::{Cli, Command};
 
@@ -6,16 +7,16 @@ use futures::executor::block_on;
 
 pub mod cli;
 pub mod config;
-pub mod database;
+pub mod directus;
 pub mod dump;
 pub mod entities;
+pub mod graph;
 pub mod manifest;
 pub mod reversed_permissions;
-pub mod test;
 pub mod utils;
 pub mod wildcard;
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
     // println!("{:#?}", args);
 
@@ -28,4 +29,5 @@ fn main() {
         }
         Command::Replace(_replace) => {}
     }
+    Ok(())
 }

@@ -54,11 +54,15 @@ pub enum OutputFormat {
     Json,
     Yaml,
     Pretty,
+    Dot,
+    GraphML,
 }
 
 const JSON_FORMAT: &str = "json";
 const YAML_FORMAT: &str = "yaml";
 const PRETTY_FORMAT: &str = "pretty";
+const DOT: &str = "dot";
+const GRAPHML: &str = "graphml";
 
 impl fmt::Display for OutputFormat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -66,6 +70,8 @@ impl fmt::Display for OutputFormat {
             OutputFormat::Json => write!(f, "{}", JSON_FORMAT),
             OutputFormat::Yaml => write!(f, "{}", YAML_FORMAT),
             OutputFormat::Pretty => write!(f, "{}", PRETTY_FORMAT),
+            OutputFormat::Dot => write!(f, "{}", DOT),
+            OutputFormat::GraphML => write!(f, "{}", GRAPHML),
         }
     }
 }
@@ -78,6 +84,8 @@ impl str::FromStr for OutputFormat {
             JSON_FORMAT => Ok(OutputFormat::Json),
             YAML_FORMAT => Ok(OutputFormat::Yaml),
             PRETTY_FORMAT => Ok(OutputFormat::Pretty),
+            DOT => Ok(OutputFormat::Dot),
+            GRAPHML => Ok(OutputFormat::GraphML),
             _ => Err(format!(
                 "Unknown output format. You used `{}`. Choose one of: `{}`, `{}`, `{}`. Use --help to see a list of all options.",
                 s, JSON_FORMAT, YAML_FORMAT, PRETTY_FORMAT
