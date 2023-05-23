@@ -1,7 +1,7 @@
+use crate::utils;
 use clap::Parser;
 use std::fmt;
 use std::str;
-use crate::utils;
 
 #[derive(Parser)]
 #[command(

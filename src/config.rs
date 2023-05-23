@@ -26,5 +26,5 @@ pub fn get_directus_system_collections() -> Vec<String> {
     return DIRECTUS_SYSTEM_COLLECTIONS
         .iter()
         .map(|c| c.to_string())
-        .collect::<Vec<String>>(); 
+        .collect::<Vec<String>>();
 }

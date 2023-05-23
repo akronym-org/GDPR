@@ -108,9 +108,7 @@ impl Builder {
                         let mut map = IndexMap::new();
                         map.insert(
                             "roles".to_owned(),
-                            Value::String(
-                                permission.role.clone().unwrap_or("public".to_owned()),
-                            ),
+                            Value::String(permission.role.clone().unwrap_or("public".to_owned())),
                         );
                         map.insert(
                             "permissions".to_owned(),

@@ -253,7 +253,11 @@ impl fmt::Display for Node {
             Node::Subject(ref s) => write!(f, "Subject({})", s),
             Node::Action(ref a) => write!(f, "Action({})", a),
             Node::Caveat(ref jv) => write!(f, "Caveat({})", jv),
-            Node::Resource(ref r) => write!(f, "Resource( collection:\"{}\", field: \"{}\")", r.collection, r.field),
+            Node::Resource(ref r) => write!(
+                f,
+                "Resource( collection:\"{}\", field: \"{}\")",
+                r.collection, r.field
+            ),
         }
     }
 }

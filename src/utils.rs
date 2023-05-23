@@ -5,7 +5,7 @@
 /// Panic if there's more than one point.
 ///
 /// # Arguments
-/// 
+///
 /// * `string` - A string splice that holds first_part.second_part
 ///
 /// # Example
@@ -21,8 +21,16 @@ pub fn split_one_point_strictly(string: &str) -> (Option<&str>, Option<&str>) {
     } else if count == 1 {
         let split = string.split_once('.').unwrap();
         return (
-            if !split.0.is_empty() { Some(split.0) } else { None },
-            if !split.1.is_empty() { Some(split.1) } else { None }
+            if !split.0.is_empty() {
+                Some(split.0)
+            } else {
+                None
+            },
+            if !split.1.is_empty() {
+                Some(split.1)
+            } else {
+                None
+            },
         );
     } else {
         panic!("{} has too many points.", string)
@@ -30,7 +38,10 @@ pub fn split_one_point_strictly(string: &str) -> (Option<&str>, Option<&str>) {
 }
 
 pub fn remove_whitespace(s: &str) -> Result<String, String> {
-    Ok(s.split(',').map(|word| word.trim().to_owned()).collect::<Vec<String>>().join(","))
+    Ok(s.split(',')
+        .map(|word| word.trim().to_owned())
+        .collect::<Vec<String>>()
+        .join(","))
 }
 
 #[cfg(test)]

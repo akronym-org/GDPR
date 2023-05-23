@@ -1,15 +1,14 @@
 use crate::cli::{Dump, OutputFormat};
 use crate::directus;
 use crate::entities::directus_permissions;
+use crate::graph::{build_graph, GraphToString};
 use crate::manifest;
 use crate::reversed_permissions;
 use crate::utils;
-use crate::graph::{GraphToString,build_graph};
-use serde::{Deserialize, Serialize};
-use sea_orm::{Database,DbErr,Select,Condition};
-use sea_orm::{entity::*, query::*};
 use petgraph_graphml::GraphMl;
-
+use sea_orm::{entity::*, query::*};
+use sea_orm::{Condition, Database, DbErr, Select};
+use serde::{Deserialize, Serialize};
 
 /// 🏡 Handle logic for the `dump` command.
 ///
@@ -36,10 +35,13 @@ pub async fn dump_entrypoint(args: &mut DumpOptions) -> Result<(), DbErr> {
 
     match args.output {
         OutputFormat::Dot => graph.draw(),
-        OutputFormat::GraphML => println!("{}", GraphMl::new(&graph)
-            .pretty_print(true)
-            .export_node_weights_display()),
-        _ => ()
+        OutputFormat::GraphML => println!(
+            "{}",
+            GraphMl::new(&graph)
+                .pretty_print(true)
+                .export_node_weights_display()
+        ),
+        _ => (),
     }
 
     // FIXME: -- skip. implemented as graph
